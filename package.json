@@ -8,7 +8,9 @@
     "dev-expose": "vite --host",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "heroku-start": "node scripts/heroku-start.js",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.12",
