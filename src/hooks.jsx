@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import axios from 'axios';
 import { MapManager } from './map.js';
 import { AddressSearch, DataUtils } from './utils.js';
 import { StorageManager } from './storage.js';
@@ -99,60 +100,60 @@ export const useData = (storageManager) => {
   const [userData, setUserData] = useState([]);
   const [allData, setAllData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
-  const tetDataLoadedRef = useRef(false);
-  const tetDataCacheRef = useRef([]);
+  const [error, setError] = useState(null);
+  const tetDataLoaded = useRef(false);
+  const userDataLoaded = useRef(false);
 
-  // Load TET data - only once!
-  const loadTETData = useCallback(async () => {
-    if (tetDataLoadedRef.current) {
-      return tetDataCacheRef.current; // Return cached data if already loaded
-    }
-    
-    try {
-      console.log('Loading TET data...');
-      const response = await fetch('/tet_offers.ndjson');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const text = await response.text();
-      const data = DataUtils.parseNDJSON(text);
-      setTetData(data);
-      tetDataLoadedRef.current = true;
-      tetDataCacheRef.current = data;
-      console.log(`Loaded ${data.length} TET offers`);
-      return data;
-    } catch (error) {
-      console.error('Error loading TET data:', error);
-      // Show user-friendly error with restart suggestion
-      if (typeof window !== 'undefined') {
+  // Load TET data once on mount
+  useEffect(() => {
+    if (tetDataLoaded.current) return;
+
+    const fetchTetData = async () => {
+      try {
+        console.log('Loading TET data...');
+        const response = await axios.get('/tet_offers.ndjson');
+        const data = DataUtils.parseNDJSON(response.data);
+        setTetData(data);
+        tetDataLoaded.current = true;
+        console.log(`Loaded ${data.length} TET offers`);
+      } catch (err) {
+        console.error('Error loading TET data:', err);
+        setError(err);
+        
+        // Show user-friendly error with restart suggestion
         const shouldRestart = window.confirm(
           'Failed to load property data. This might be due to a network issue.\n\nWould you like to restart the page to try again?'
         );
         if (shouldRestart) {
           window.location.reload();
         }
+        
+        tetDataLoaded.current = true; // Prevent infinite retry
       }
-      tetDataLoadedRef.current = true; // Mark as loaded to prevent infinite retry
-      tetDataCacheRef.current = [];
-      return []; // Return empty array on error
-    }
-  }, []); // No dependencies - function should never be recreated
+    };
 
-  // Load user data from storage
-  const loadUserData = useCallback(async () => {
-    if (!storageManager) return [];
-    
-    try {
-      const userDataEntries = await storageManager.getAllUserData();
-      const data = userDataEntries.flatMap(entry => entry.data);
-      setUserData(data);
-      console.log(`Loaded ${data.length} user data entries`);
-      return data;
-    } catch (error) {
-      console.error('Error loading user data:', error);
-      return [];
-    }
+    fetchTetData();
+  }, []);
+
+  // Load user data from storage - ONLY ONCE
+  useEffect(() => {
+    if (!storageManager || userDataLoaded.current) return;
+
+    const loadUserData = async () => {
+      try {
+        const userDataEntries = await storageManager.getAllUserData();
+        const data = userDataEntries.flatMap(entry => entry.data);
+        setUserData(data);
+        console.log(`Loaded ${data.length} user data entries`);
+      } catch (err) {
+        console.error('Error loading user data:', err);
+      } finally {
+        userDataLoaded.current = true; // Mark as loaded regardless of success/failure
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
   }, [storageManager]);
 
   // Add user data
@@ -169,44 +170,27 @@ export const useData = (storageManager) => {
     // Save to storage
     await storageManager.saveUserData(validFeatures, filename);
     
-    // Update state with functional update to avoid stale closure
+    // Update state
     setUserData(prevData => [...prevData, ...validFeatures]);
     
     return validFeatures;
-  }, [storageManager]); // Remove userData dependency to prevent infinite loops
-
-  // Initialize data loading (only once)
-  useEffect(() => {
-    if (initialized || !storageManager) return;
-
-    const initializeData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          loadTETData(),
-          loadUserData()
-        ]);
-      } catch (error) {
-        console.error('Error initializing data:', error);
-      } finally {
-        setLoading(false);
-        setInitialized(true);
-      }
-    };
-
-    initializeData();
-  }, [storageManager, loadTETData, loadUserData, initialized]); // Properly memoized dependencies
+  }, [storageManager]);
 
   // Update allData when tetData or userData changes
   useEffect(() => {
     setAllData([...tetData, ...userData]);
   }, [tetData, userData]);
 
+  // Dummy functions for compatibility
+  const loadTETData = async () => tetData;
+  const loadUserData = async () => userData;
+
   return {
     tetData,
     userData,
     allData,
     loading,
+    error,
     addUserData,
     loadTETData,
     loadUserData
