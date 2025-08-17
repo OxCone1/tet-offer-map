@@ -101,10 +101,13 @@ export const useData = (storageManager) => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const tetDataLoadedRef = useRef(false);
+  const tetDataCacheRef = useRef([]);
 
   // Load TET data - only once!
   const loadTETData = useCallback(async () => {
-    if (tetDataLoadedRef.current) return tetData; // Return cached data if already loaded
+    if (tetDataLoadedRef.current) {
+      return tetDataCacheRef.current; // Return cached data if already loaded
+    }
     
     try {
       console.log('Loading TET data...');
@@ -116,6 +119,7 @@ export const useData = (storageManager) => {
       const data = DataUtils.parseNDJSON(text);
       setTetData(data);
       tetDataLoadedRef.current = true;
+      tetDataCacheRef.current = data;
       console.log(`Loaded ${data.length} TET offers`);
       return data;
     } catch (error) {
@@ -130,9 +134,10 @@ export const useData = (storageManager) => {
         }
       }
       tetDataLoadedRef.current = true; // Mark as loaded to prevent infinite retry
+      tetDataCacheRef.current = [];
       return []; // Return empty array on error
     }
-  }, [tetData]); // Only depend on tetData for return value
+  }, []); // No dependencies - function should never be recreated
 
   // Load user data from storage
   const loadUserData = useCallback(async () => {
