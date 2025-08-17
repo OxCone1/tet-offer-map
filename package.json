@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "heroku-start": "node scripts/heroku-start.js",
+    "heroku-start": "node scripts/heroku-start.cjs",
     "postinstall": "npm run build"
   },
   "dependencies": {
