@@ -100,11 +100,11 @@ export const useData = (storageManager) => {
   const [allData, setAllData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [tetDataLoaded, setTetDataLoaded] = useState(false);
+  const tetDataLoadedRef = useRef(false);
 
   // Load TET data - only once!
   const loadTETData = useCallback(async () => {
-    if (tetDataLoaded) return tetData; // Return cached data if already loaded
+    if (tetDataLoadedRef.current) return tetData; // Return cached data if already loaded
     
     try {
       console.log('Loading TET data...');
@@ -115,14 +115,24 @@ export const useData = (storageManager) => {
       const text = await response.text();
       const data = DataUtils.parseNDJSON(text);
       setTetData(data);
-      setTetDataLoaded(true);
+      tetDataLoadedRef.current = true;
       console.log(`Loaded ${data.length} TET offers`);
       return data;
     } catch (error) {
       console.error('Error loading TET data:', error);
+      // Show user-friendly error with restart suggestion
+      if (typeof window !== 'undefined') {
+        const shouldRestart = window.confirm(
+          'Failed to load property data. This might be due to a network issue.\n\nWould you like to restart the page to try again?'
+        );
+        if (shouldRestart) {
+          window.location.reload();
+        }
+      }
+      tetDataLoadedRef.current = true; // Mark as loaded to prevent infinite retry
       return []; // Return empty array on error
     }
-  }, [tetDataLoaded]); // Remove tetData dependency to prevent infinite loops
+  }, [tetData]); // Only depend on tetData for return value
 
   // Load user data from storage
   const loadUserData = useCallback(async () => {
