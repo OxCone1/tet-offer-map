@@ -1,0 +1,5 @@
+node_modules
+tet_offers.ndjson
+package-lock.json
+tet_errors.ndjson
+progress.json
