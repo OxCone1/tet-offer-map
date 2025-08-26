@@ -1,6 +1,6 @@
 # Tet Offer Map – Frontend
 
-Live Demo: https://tetmap-9195211e7616.herokuapp.com/
+Live Demo: https://oxcone.com/tet-map/
 
 Interactive web map for visualising Tet (Latvia) internet service availability combined with user‑supplied connectivity data. Built with React + Vite + Leaflet. Supports fuzzy address search, data layer toggles, connection type filtering, clustering / sector highlighting, and per‑property detail modals.
 

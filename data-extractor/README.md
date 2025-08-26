@@ -1,6 +1,6 @@
 # Data Extractor (Overpass → Tet Offer Scraper)
 
-Live Demo (frontend consuming this output): https://tetmap-9195211e7616.herokuapp.com/
+Live Demo (frontend consuming this output): https://oxcone.com/tet-map/
 
 This folder contains a headless scraper that takes OpenStreetMap (OSM) address features from an exported GeoJSON (`export.geojson`) and queries Tet availability (https://www.tet.lv/pieejamiba). It enriches each feature with offer data and writes incremental NDJSON output so you can resume if it crashes.
 
