@@ -1,6 +1,6 @@
 # Tet Offer Map – Monorepo
 
-Live Demo: https://tetmap-9195211e7616.herokuapp.com/
+Live Demo: https://oxcone.com/tet-map/
 
 Full workflow to extract Latvian Tet internet availability data and visualize it on an interactive web map with optional user‑provided connectivity layers.
 
