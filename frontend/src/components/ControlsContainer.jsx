@@ -120,8 +120,8 @@ const ControlsContainer = ({
             onClick={handleUploadClick}
             className="w-full mt-4 border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 py-6 bg-transparent"
           >
-            <div className="flex flex-col items-center gap-2">
-              <svg className="h-5 w-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex flex-row items-center">
+              <svg className="h-9 w-9 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -129,8 +129,10 @@ const ControlsContainer = ({
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              <span className="text-sm font-medium">{translate('controls.file.upload')}</span>
-              <span className="text-xs text-slate-500">JSON, GeoJSON, NDJSON</span>
+              <div className="ml-3 flex flex-col items-start">
+                <span className="text-sm font-medium">{translate('controls.file.upload')}</span>
+                <span className="text-xs text-slate-500">( JSON, GeoJSON, NDJSON )</span>
+              </div>
             </div>
           </Button>
 
