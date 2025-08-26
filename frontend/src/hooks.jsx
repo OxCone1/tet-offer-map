@@ -159,21 +159,72 @@ export const useData = (storageManager) => {
   // Add user data
   const addUserData = useCallback(async (newData, filename) => {
     if (!storageManager) return;
+    // Normalize incoming records into GeoJSON Features accepted by the app
+    // Supported input shapes:
+    // 1. Proper GeoJSON Feature with properties.address + properties.connection_type
+    // 2. TET property objects (same shape as entries in tet_offers.ndjson) -> convert
+    // 3. Plain objects that look like { id, address, geometry, offers } (minimal subset) -> convert
+    const features = [];
 
-    // Validate data
-    const validFeatures = newData.filter(feature => DataUtils.isValidGeoJSONFeature(feature));
-    
-    if (validFeatures.length === 0) {
-      throw new Error('No valid GeoJSON features found in file');
+    const toFeature = (item) => {
+      // Already a valid feature
+      if (DataUtils.isValidGeoJSONFeature(item)) return item;
+
+      // TET style property object
+      if (DataUtils.isValidTETProperty(item)) {
+        const primaryOffer = item.offers[0] || {};
+        const connectionType = DataUtils.normalizeConnectionType(primaryOffer.connectionType || primaryOffer.type || primaryOffer.connection_type);
+        return {
+          type: 'Feature',
+            geometry: item.geometry,
+            properties: {
+              address: item.address,
+              connection_type: connectionType,
+              id: item.id,
+              offers: item.offers,
+              scrapedAt: item.scrapedAt,
+              source: item.source,
+              // Flatten original nested properties if present
+              ...(item.properties || {})
+            }
+        };
+      }
+
+      // Attempt heuristic conversion if object resembles a TET property (no nested properties field)
+      if (item && item.address && item.geometry && item.offers) {
+        const primaryOffer = item.offers[0] || {};
+        const connectionType = DataUtils.normalizeConnectionType(primaryOffer.connectionType || primaryOffer.type || primaryOffer.connection_type);
+        return {
+          type: 'Feature',
+          geometry: item.geometry,
+          properties: {
+            address: item.address,
+            connection_type: connectionType,
+            id: item.id,
+            offers: item.offers,
+            scrapedAt: item.scrapedAt,
+            source: item.source
+          }
+        };
+      }
+      return null;
+    };
+
+    (Array.isArray(newData) ? newData : [newData]).forEach(rec => {
+      const f = toFeature(rec);
+      if (f && DataUtils.isValidGeoJSONFeature(f)) {
+        features.push(f);
+      }
+    });
+
+    if (features.length === 0) {
+      throw new Error('No valid features or TET properties found in file');
     }
 
-    // Save to storage
-    await storageManager.saveUserData(validFeatures, filename);
-    
-    // Update state
-    setUserData(prevData => [...prevData, ...validFeatures]);
-    
-    return validFeatures;
+    // Save normalized features to storage
+    await storageManager.saveUserData(features, filename);
+    setUserData(prev => [...prev, ...features]);
+    return features;
   }, [storageManager]);
 
   // Update allData when tetData or userData changes

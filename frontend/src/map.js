@@ -158,6 +158,37 @@ export class MapManager {
   }
 
   /**
+   * Create a layer for a generic user GeoJSON Feature
+   */
+  createFeatureLayer(feature, color, isUserData) {
+    if (!feature || feature.type !== 'Feature' || !feature.geometry) return null;
+    const { geometry } = feature;
+    const styleOpts = this._styleForGeometry(geometry, color);
+
+    if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
+      return L.geoJSON(feature, {
+        style: styleOpts.polygon,
+        onEachFeature: (feat, layer) => {
+          layer.on('click', () => {
+            if (this.showPropertyDetails) {
+              // Pass the feature properties; mark as user data
+              this.showPropertyDetails(feat.properties, isUserData);
+            }
+          });
+        }
+      });
+    } else if (geometry.type === 'Point') {
+      const coords = geometry.coordinates;
+      return L.circleMarker([coords[1], coords[0]], styleOpts.point).on('click', () => {
+        if (this.showPropertyDetails) {
+          this.showPropertyDetails(feature.properties, isUserData);
+        }
+      });
+    }
+    return null;
+  }
+
+  /**
    * Show property details (will be implemented by the main app)
    */
   showPropertyDetails(properties, isUserData) {

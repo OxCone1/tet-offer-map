@@ -195,9 +195,9 @@ const AppContent = () => {
         href="https://linktr.ee/oxcone"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50 
+        className="fixed top-0 left-1/2 transform min-w-max -translate-x-1/2 z-50 
                      bg-black/80 backdrop-blur-sm 
-                     rounded-b-2xl px-4 py-2 text-xs text-white 
+                     rounded-b-2xl px-4 py-1.5 text-xs text-white 
                      hover:bg-black/90 transition-all duration-300 
                      shadow-lg hover:shadow-xl flex items-center gap-1.5 "
       >
