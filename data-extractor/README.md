@@ -71,6 +71,7 @@ If the script crashes, fix the cause (selectors, network, etc.) and run `npm sta
 | Many rapid failures | Tet layout change: update selectors in `index.js`. |
 | Overpass export too large | Split the area into smaller bounding boxes and merge NDJSON outputs later. |
 | Memory usage grows | Run in smaller batches; archive older NDJSON lines. |
+| Puppeteer Chrome not found / download error | See "Puppeteer troubleshooting" below. |
 
 ## 7. Consuming the Output
 The frontend expects `tet_offers.ndjson` at build/deploy time. After scraping, copy or symlink this file into the frontend's `public` (or wherever it's being served) before building the production bundle.
@@ -86,6 +87,36 @@ Be polite: avoid huge bounding boxes; respect delays already in the script (add 
 - Automatic selector fallback heuristics
 - Optional CSV export
 - CLI flags for bounding box filtering
+
+## Puppeteer troubleshooting
+
+When running the scraper Puppeteer may fail to locate or download a matching Chromium/Chrome binary. A common error looks like:
+
+```
+Error: Could not find Chrome (ver. 139.0.7258.68). This can occur if either
+ 1. you did not perform an installation before running the script (e.g. `npx puppeteer browsers install chrome`) or
+ 2. your cache path is incorrectly configured.
+```
+
+Try these steps in order:
+
+1. Ensure the environment variable `PUPPETEER_SKIP_DOWNLOAD` is set to `false` before installing or running the scraper. On Windows PowerShell you can run:
+
+```powershell
+setx PUPPETEER_SKIP_DOWNLOAD false
+```
+
+2. If step 1 didn't help, explicitly install the Chrome browser package used by Puppeteer:
+
+```powershell
+npx puppeteer browsers install chrome
+```
+
+3. If installation still fails, inspect or clear Puppeteer's cache directory (shown in the error, e.g. `C:\Users\%userprofile%\.cache\puppeteer`) and retry step 2. You can remove the cache folder and re-run the install command.
+
+4. As a last resort, set `PUPPETEER_EXECUTABLE_PATH` to a system-installed Chrome/Chromium binary path so Puppeteer uses the local browser instead of downloading.
+
+These steps should resolve most Chrome download / detection issues when running the scraper.
 
 ---
 Need a new batch? Just create a fresh bounding box in Overpass Turbo, export, replace `export.geojson`, run again.

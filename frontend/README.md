@@ -148,5 +148,23 @@ Ideas:
 | Missing offers in modal | Verify `offers` array present per line in NDJSON. |
 | Sector overlay empty | Not enough clustered points (adjust radius / minPts). |
 
+### Puppeteer / scraper Chrome download issues
+
+If you run the scraper from the root `data-extractor` folder and see a Puppeteer error about missing Chrome, follow the steps in `data-extractor/README.md` under "Puppeteer troubleshooting". Short checklist:
+
+1. Set `PUPPETEER_SKIP_DOWNLOAD` to `false`:
+
+```powershell
+setx PUPPETEER_SKIP_DOWNLOAD false
+```
+
+2. Run the explicit install:
+
+```powershell
+npx puppeteer browsers install chrome
+```
+
+3. If needed, clear the Puppeteer cache (path shown in error) and retry, or set `PUPPETEER_EXECUTABLE_PATH` to a local Chrome binary.
+
 ---
 Place `tet_offers.ndjson` → run dev/build → explore. That’s it.

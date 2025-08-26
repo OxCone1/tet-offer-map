@@ -126,6 +126,9 @@ User uploaded Feature requirement:
 | Blank map | Container needs height (see root div) / network blocked tiles. |
 | Modal empty | Input object missing `offers` or address properties. |
 | Scraper stalls | Site markup change → adjust selectors in `data-extractor/index.js`. |
+| Puppeteer Chrome download error | See "Puppeteer troubleshooting" in `data-extractor/README.md`. |
+
+
 
 ## 10. Future Enhancements
 - Streaming parser for very large NDJSON (progressive rendering)
