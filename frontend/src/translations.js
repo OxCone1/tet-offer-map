@@ -82,6 +82,7 @@ export const translations = {
         "disclaimer.educational": "All data displayed on this website has been gathered for educational purposes only and has no legal or other binding implications.",
         "disclaimer.responsibility": "Users are responsible for double-checking availability and accuracy on the official TET website at",
         "disclaimer.accuracy": "All data has been gathered from openly available sources and may not reflect current or accurate information.",
+    "disclaimer.motivation": "Goal: help people see what internet connection types nearby addresses already have so they can seek better coverage and raise awareness locally.",
         "disclaimer.understood": "Understood",
 
         // General UI
@@ -178,6 +179,7 @@ export const translations = {
         "disclaimer.educational": "Все данные, отображаемые на этом веб-сайте, собраны только в образовательных целях и не имеют юридических или иных обязательных последствий.",
         "disclaimer.responsibility": "Пользователи несут ответственность за двойную проверку доступности и точности на официальном веб-сайте TET по адресу",
         "disclaimer.accuracy": "Все данные собраны из открытых источников и могут не отражать текущую или точную информацию.",
+    "disclaimer.motivation": "Цель: помочь людям увидеть, какие типы интернет-подключений уже есть у соседних адресов, чтобы добиваться лучшего покрытия и повышать осведомлённость в своём районе.",
         "disclaimer.understood": "Понятно",
 
         // General UI
@@ -274,6 +276,7 @@ export const translations = {
         "disclaimer.educational": "Visi šajā tīmekļa vietnē parādītie dati ir apkopoti tikai izglītības nolūkos, un tiem nav juridisku vai citu saistošu seku.",
         "disclaimer.responsibility": "Lietotāji ir atbildīgi par pieejamības un precizitātes dubultpārbaudi oficiālajā TET tīmekļa vietnē",
         "disclaimer.accuracy": "Visi dati ir apkopoti no atklāti pieejamiem avotiem un var neatspoguļot pašreizējo vai precīzu informāciju.",
+    "disclaimer.motivation": "Mērķis: palīdzēt cilvēkiem redzēt, kādi interneta savienojumu veidi ir tuvākajās adresēs, lai panāktu labāku pārklājumu un veicinātu informētību apkaimē.",
         "disclaimer.understood": "Sapratu",
 
         // General UI

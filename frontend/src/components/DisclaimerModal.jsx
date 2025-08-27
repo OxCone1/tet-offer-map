@@ -61,6 +61,9 @@ export default function DisclaimerModal() {
                     <p className="text-sm text-gray-700 leading-relaxed">
                         {translate('disclaimer.accuracy')}
                     </p>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                        {translate('disclaimer.motivation')}
+                    </p>
                 </div>
 
                 {/* Footer */}
