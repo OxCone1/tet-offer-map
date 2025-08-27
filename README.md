@@ -4,6 +4,9 @@ Live Demo: https://oxcone.com/tet-map/
 
 Full workflow to extract Latvian Tet internet availability data and visualize it on an interactive web map with optional user‑provided connectivity layers.
 
+## Motivation
+I built this to give everyday users a clear, map‑based view of the real connectivity landscape around them: what kinds of internet technologies their neighbours already have, and where gaps still exist. Having that visibility helps people argue for upgrades, choose a better provider/technology, and generally raise local awareness about broadband availability (or the lack of it) in their area. The goal is empowerment through transparency – turning scattered, opaque availability checks into an explorable shared layer.
+
 ## Contents
 | Folder | Purpose |
 |--------|---------|
