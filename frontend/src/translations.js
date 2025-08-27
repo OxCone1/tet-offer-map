@@ -51,6 +51,16 @@ export const translations = {
 
         // Controls
         "controls.data.layers": "Data Layers",
+    "controls.show": "Show",
+    "controls.hide": "Hide",
+    "controls.no.datasets": "No datasets yet",
+    "controls.name.upload": "Name your dataset",
+    "controls.dataset.name": "Dataset Name",
+    "controls.dataset.name.placeholder": "e.g. My Offers February",
+    "controls.original.file": "Original file",
+    "controls.cancel": "Cancel",
+    "controls.upload": "Upload",
+    "controls.delete.dataset": "Delete dataset",
         "controls.sectors": "Sector Analysis",
         "controls.sectors.show": "Show Density Sectors",
         "controls.sectors.radius": "Radius (m)",
@@ -65,6 +75,7 @@ export const translations = {
         "message.file.success": "Successfully loaded {count} features from {filename}",
         "message.file.error": "Error processing file. Please check the format.",
         "message.no.valid.features": "No valid GeoJSON features found in file",
+    "message.dataset.deleted": "Dataset deleted",
 
         // Disclaimer Modal
         "disclaimer.title": "Important Notice",
@@ -136,6 +147,16 @@ export const translations = {
 
         // Controls
         "controls.data.layers": "Слои данных",
+    "controls.show": "Показать",
+    "controls.hide": "Скрыть",
+    "controls.no.datasets": "Пока нет наборов данных",
+    "controls.name.upload": "Назовите набор данных",
+    "controls.dataset.name": "Название набора",
+    "controls.dataset.name.placeholder": "например, Мои адреса Февраль",
+    "controls.original.file": "Исходный файл",
+    "controls.cancel": "Отмена",
+    "controls.upload": "Загрузить",
+    "controls.delete.dataset": "Удалить набор данных",
         "controls.sectors": "Анализ секторов",
         "controls.sectors.show": "Показать сектора плотности",
         "controls.sectors.radius": "Радиус (м)",
@@ -150,6 +171,7 @@ export const translations = {
         "message.file.success": "Успешно загружено {count} объектов из {filename}",
         "message.file.error": "Ошибка обработки файла. Проверьте формат.",
         "message.no.valid.features": "В файле не найдено действительных объектов GeoJSON",
+    "message.dataset.deleted": "Набор данных удалён",
 
         // Disclaimer Modal
         "disclaimer.title": "Важное уведомление",
@@ -221,6 +243,16 @@ export const translations = {
 
         // Controls
         "controls.data.layers": "Datu slāņi",
+    "controls.show": "Rādīt",
+    "controls.hide": "Slēpt",
+    "controls.no.datasets": "Vēl nav datu kopu",
+    "controls.name.upload": "Nosauciet datu kopu",
+    "controls.dataset.name": "Datu kopas nosaukums",
+    "controls.dataset.name.placeholder": "piem., Mani piedāvājumi Februāris",
+    "controls.original.file": "Oriģinālais fails",
+    "controls.cancel": "Atcelt",
+    "controls.upload": "Augšupielādēt",
+    "controls.delete.dataset": "Dzēst datu kopu",
         "controls.sectors": "Sektoru analīze",
         "controls.sectors.show": "Rādīt blīvuma sektorus",
         "controls.sectors.radius": "Rādiuss (m)",
@@ -235,6 +267,7 @@ export const translations = {
         "message.file.success": "Veiksmīgi ielādēti {count} objekti no {filename}",
         "message.file.error": "Kļūda apstrādājot failu. Pārbaudiet formātu.",
         "message.no.valid.features": "Failā nav atrasti derīgi GeoJSON objekti",
+    "message.dataset.deleted": "Datu kopa izdzēsta",
 
         // Disclaimer Modal
         "disclaimer.title": "Svarīgs paziņojums",

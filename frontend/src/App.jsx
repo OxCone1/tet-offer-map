@@ -32,7 +32,29 @@ const AppContent = () => {
   const isMobile = useMobile()
   const { showNotification } = useNotifications()
   const storage = useStorage()
-  const { tetData, userData, allData, loading, addUserData } = useData(storage)
+  const { tetData, userData, userDataEntries, allData, loading, addUserData, deleteUserDataset } = useData(storage)
+  // Per user dataset visibility map (id -> bool)
+  const [datasetVisibility, setDatasetVisibility] = useState({});
+
+  // Compute visible user features based on per-dataset visibility (default true)
+  const visibleUserData = (userDataEntries && userDataEntries.length > 0)
+    ? userDataEntries.reduce((acc, ds) => {
+        if (datasetVisibility[ds.id] !== false) acc.push(...(ds.data || []));
+        return acc;
+      }, [])
+    : userData;
+
+  // Initialize any newly loaded datasets visibility to true
+  useEffect(() => {
+    if (!userDataEntries) return;
+    setDatasetVisibility(prev => {
+      const next = { ...prev };
+      userDataEntries.forEach(ds => {
+        if (next[ds.id] === undefined) next[ds.id] = true;
+      });
+      return next;
+    });
+  }, [userDataEntries]);
 
   // Map state
   const [showTetData, setShowTetData] = useState(true)
@@ -70,33 +92,37 @@ const AppContent = () => {
     if (!mapManager) return
 
     // Update cached data first
-    if (tetData.length > 0) mapManager.tetDataCache = tetData
-    if (userData.length > 0) mapManager.userDataCache = userData
+  if (tetData.length > 0) mapManager.tetDataCache = tetData
+  mapManager.userDataCache = visibleUserData
 
     // Use toggle methods to respect visibility
     mapManager.toggleTETData(showTetData)
     mapManager.toggleUserData(showUserData)
 
-    // Populate layers if they should be visible
-    if (showTetData && tetData.length > 0) {
-      mapManager.addTETData(tetData)
+    // Always refresh layers when visible (addUserData / addTETData internally clears layer first)
+    if (showTetData) {
+      mapManager.addTETData(tetData || [])
+    } else {
+      mapManager.tetLayer.clearLayers()
     }
-    if (showUserData && userData.length > 0) {
-      mapManager.addUserData(userData)
+    if (showUserData) {
+      mapManager.addUserData(visibleUserData || []) // empty array clears existing features
+    } else {
+      mapManager.userLayer.clearLayers()
     }
 
     // Update sectors overlay whenever base layers change
     mapManager.toggleSectors(showSectors)
     mapManager.updateSectors({
       tet: tetData,
-      user: userData,
+    user: visibleUserData,
       includeTet: showTetData,
       includeUser: showUserData,
       epsMeters: sectorsRadius,
       minPts: sectorsMinPts,
     })
     mapManager.setTypeFilters(typeFilters)
-  }, [mapManager, tetData, userData, showTetData, showUserData, showSectors, sectorsRadius, sectorsMinPts, typeFilters])
+  }, [mapManager, tetData, visibleUserData, showTetData, showUserData, showSectors, sectorsRadius, sectorsMinPts, typeFilters, userDataEntries, datasetVisibility])
 
   // Handle search result selection
   const handleSearchResultSelect = (result) => {
@@ -132,7 +158,7 @@ const AppContent = () => {
   }
 
   // Handle file upload
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = async (file, datasetName) => {
     if (!file) return
 
     try {
@@ -148,15 +174,35 @@ const AppContent = () => {
         }
       }
 
-      const validFeatures = await addUserData(data, file.name)
+  const { id, features } = await addUserData(data, file.name, datasetName)
 
       // Enable user data layer
       setShowUserData(true)
 
-      showNotification(translate('message.file.success', { count: validFeatures.length, filename: file.name }), "success")
+  // Ensure visibility on new dataset
+  setDatasetVisibility(prev => ({ ...prev, [id]: true }))
+  showNotification(translate('message.file.success', { count: features.length, filename: datasetName || file.name }), "success")
     } catch (error) {
       console.error("Error processing file:", error)
       showNotification(translate('message.file.error'), "error")
+    }
+  }
+
+  // Delete a specific user dataset
+  const handleDeleteDataset = async (id) => {
+    if (!id) return;
+    const confirmed = window.confirm(translate('controls.delete.dataset') + '?');
+    if (!confirmed) return;
+    const ok = await deleteUserDataset(id);
+    if (ok) {
+      setDatasetVisibility(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      showNotification(translate('message.dataset.deleted'), 'success');
+    } else {
+      showNotification(translate('ui.error'), 'error');
     }
   }
 
@@ -226,7 +272,7 @@ const AppContent = () => {
         // Controls props
         showTetData={showTetData}
         showUserData={showUserData}
-        userDataCount={userData.length}
+  userDataCount={visibleUserData.length}
         onToggleTetData={setShowTetData}
         onToggleUserData={setShowUserData}
         onFileUpload={handleFileUpload}
@@ -238,8 +284,12 @@ const AppContent = () => {
         onChangeSectorsMinPts={setSectorsMinPts}
         typeFilters={typeFilters}
         onChangeTypeFilters={setTypeFilters}
-        tetData={tetData}
-        userData={userData}
+  tetData={tetData}
+  userData={visibleUserData}
+  userDatasets={userDataEntries?.map(e => ({ id: e.id, name: e.name || e.filename, count: e.data?.length || 0 })) || []}
+  datasetVisibility={datasetVisibility}
+  onToggleDataset={(id, value) => setDatasetVisibility(prev => ({ ...prev, [id]: value }))}
+  onDeleteDataset={handleDeleteDataset}
       />
 
       <div className={`h-full transition-all duration-300 ${!isMobile ? "ml-0" : ""}`}>
@@ -253,7 +303,7 @@ const AppContent = () => {
         isMobile={isMobile}
         isControlPanelOpen={isControlPanelOpen}
         tetData={tetData}
-        userData={userData}
+  userData={visibleUserData}
         showTetData={showTetData}
         showUserData={showUserData}
         mapManager={mapManager}

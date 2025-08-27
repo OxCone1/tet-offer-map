@@ -73,8 +73,8 @@ export const useSearch = (data) => {
 export const useStorage = () => {
   const [storageManager] = useState(() => new StorageManager());
 
-  const saveUserData = async (data, filename) => {
-    return await storageManager.saveUserData(data, filename);
+  const saveUserData = async (data, filename, name) => {
+    return await storageManager.saveUserData(data, filename, name);
   };
 
   const getAllUserData = async () => {
@@ -98,6 +98,7 @@ export const useStorage = () => {
 export const useData = (storageManager) => {
   const [tetData, setTetData] = useState([]);
   const [userData, setUserData] = useState([]);
+  const [userDataEntries, setUserDataEntries] = useState([]); // full entries with metadata
   const [allData, setAllData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -141,10 +142,11 @@ export const useData = (storageManager) => {
 
     const loadUserData = async () => {
       try {
-        const userDataEntries = await storageManager.getAllUserData();
-        const data = userDataEntries.flatMap(entry => entry.data);
-        setUserData(data);
-        console.log(`Loaded ${data.length} user data entries`);
+  const entries = await storageManager.getAllUserData();
+  const data = entries.flatMap(entry => entry.data);
+  setUserData(data);
+  setUserDataEntries(entries);
+  console.log(`Loaded ${data.length} user data features across ${entries.length} datasets`);
       } catch (err) {
         console.error('Error loading user data:', err);
       } finally {
@@ -157,7 +159,7 @@ export const useData = (storageManager) => {
   }, [storageManager]);
 
   // Add user data
-  const addUserData = useCallback(async (newData, filename) => {
+  const addUserData = useCallback(async (newData, filename, datasetName) => {
     if (!storageManager) return;
     // Normalize incoming records into GeoJSON Features accepted by the app
     // Supported input shapes:
@@ -222,9 +224,29 @@ export const useData = (storageManager) => {
     }
 
     // Save normalized features to storage
-    await storageManager.saveUserData(features, filename);
-    setUserData(prev => [...prev, ...features]);
-    return features;
+  const id = await storageManager.saveUserData(features, filename, datasetName);
+  setUserData(prev => [...prev, ...features]);
+  setUserDataEntries(prev => [...prev, { id, filename, name: datasetName || filename, data: features }]);
+  return { id, features, name: datasetName || filename };
+  }, [storageManager]);
+
+  // Delete a user dataset by id (updates local state immediately)
+  const deleteUserDataset = useCallback(async (id) => {
+    if (!storageManager || !id) return false;
+    try {
+      await storageManager.deleteUserData(id);
+      setUserDataEntries(prev => {
+        const updated = prev.filter(e => e.id !== id);
+        // Rebuild flattened userData from remaining entries
+        const flattened = updated.flatMap(e => e.data);
+        setUserData(flattened);
+        return updated;
+      });
+      return true;
+    } catch (e) {
+      console.error('Failed to delete dataset', e);
+      return false;
+    }
   }, [storageManager]);
 
   // Update allData when tetData or userData changes
@@ -242,7 +264,9 @@ export const useData = (storageManager) => {
     allData,
     loading,
     error,
-    addUserData,
+  addUserData,
+  userDataEntries,
+  deleteUserDataset,
     loadTETData,
     loadUserData
   };

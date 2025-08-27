@@ -15,11 +15,12 @@ export class StorageManager {
   /**
    * Save user data to local storage
    */
-  async saveUserData(data, filename) {
+  async saveUserData(data, filename, name) {
     try {
       const userData = {
         data,
         filename,
+        name: name || filename,
         uploadDate: new Date().toISOString(),
         id: Date.now().toString()
       };
@@ -31,6 +32,7 @@ export class StorageManager {
       index.push({
         id: userData.id,
         filename,
+        name: userData.name,
         uploadDate: userData.uploadDate,
         recordCount: data.length
       });

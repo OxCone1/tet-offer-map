@@ -37,6 +37,10 @@ function NavigationContent({
     onChangeSectorsMinPts,
     tetData,
     userData,
+    userDatasets,
+    datasetVisibility,
+    onToggleDataset,
+    onDeleteDataset,
 }) {
     const translate = useTranslate()
     
@@ -118,6 +122,10 @@ function NavigationContent({
                             onChangeTypeFilters={onChangeTypeFilters}
                             tetData={tetData}
                             userData={userData}
+                            userDatasets={userDatasets}
+                            datasetVisibility={datasetVisibility}
+                            onToggleDataset={onToggleDataset}
+                            onDeleteDataset={onDeleteDataset}
                         />
                     </div>
                 )}
@@ -152,6 +160,10 @@ const NavigationPanel = ({
     onChangeTypeFilters,
     tetData,
     userData,
+    userDatasets,
+    datasetVisibility,
+    onToggleDataset,
+    onDeleteDataset,
     onOpenChange, // Optional callback for panel state changes
 }) => {
     const translate = useTranslate()
@@ -215,6 +227,10 @@ const NavigationPanel = ({
                                                             onChangeTypeFilters={onChangeTypeFilters}
                                                             tetData={tetData}
                                                             userData={userData}
+                                                            userDatasets={userDatasets}
+                                                            datasetVisibility={datasetVisibility}
+                                                            onToggleDataset={onToggleDataset}
+                                                            onDeleteDataset={onDeleteDataset}
                                                         />
                         </SheetContent>
                     </Sheet>
@@ -271,6 +287,10 @@ const NavigationPanel = ({
                                                     onChangeTypeFilters={onChangeTypeFilters}
                                                     tetData={tetData}
                                                     userData={userData}
+                                                    userDatasets={userDatasets}
+                                                    datasetVisibility={datasetVisibility}
+                                                    onToggleDataset={onToggleDataset}
+                                                    onDeleteDataset={onDeleteDataset}
                                                 />
                     </CardContent>
                 </Card>

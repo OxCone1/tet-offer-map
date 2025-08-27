@@ -1,12 +1,15 @@
 "use client"
 
-import { useRef, useMemo } from "react"
+import { useRef, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Checkbox } from "./ui/checkbox"
 import { Label } from "./ui/label"
 import { Badge } from "./ui/badge"
 import { DataUtils } from '../utils.js'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
+import { Input } from './ui/input'
+import { Switch } from './ui/switch'
 import { useTranslate } from '../hooks/useTranslation.jsx'
 
 const ControlsContainer = ({
@@ -25,10 +28,18 @@ const ControlsContainer = ({
   typeFilters,
   onChangeTypeFilters,
   tetData,
-  userData
+  userData,
+  userDatasets = [],
+  datasetVisibility = {},
+  onToggleDataset,
+  onDeleteDataset
 }) => {
     const translate = useTranslate()
     const fileInputRef = useRef(null)
+    const [pendingFile, setPendingFile] = useState(null)
+    const [datasetName, setDatasetName] = useState("")
+    const [showNameDialog, setShowNameDialog] = useState(false)
+    const [showDatasets, setShowDatasets] = useState(false)
 
     // Calculate available connection types from visible data layers
     const availableTypes = useMemo(() => {
@@ -60,10 +71,28 @@ const ControlsContainer = ({
   const handleFileChange = (event) => {
     const file = event.target.files[0]
     if (file) {
-      onFileUpload(file)
-      // Clear the input so the same file can be uploaded again
-      event.target.value = ""
+      setPendingFile(file)
+      const base = file.name.replace(/\.(ndjson|geojson|json)$/i, '')
+      setDatasetName(base)
+      setShowNameDialog(true)
     }
+  }
+
+  const confirmUpload = () => {
+    if (pendingFile) {
+      onFileUpload(pendingFile, datasetName.trim() || pendingFile.name)
+    }
+    setPendingFile(null)
+    setDatasetName("")
+    setShowNameDialog(false)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const cancelUpload = () => {
+    setPendingFile(null)
+    setDatasetName("")
+    setShowNameDialog(false)
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   return (
@@ -111,8 +140,51 @@ const ControlsContainer = ({
                 )}
               </Label>
             </div>
-            <div className="w-3 h-3 bg-emerald-600 rounded-full"></div>
+            <button
+              type="button"
+              onClick={() => setShowDatasets(v => !v)}
+              className="text-xs text-emerald-700 underline hover:no-underline"
+            >
+              {showDatasets ? translate('controls.hide') || 'Hide' : translate('controls.show') || 'Show'}
+            </button>
           </div>
+
+          {showUserData && showDatasets && (
+            <div className="rounded-md border border-emerald-200 p-2 space-y-2 bg-emerald-50/50 max-h-48 overflow-y-auto text-sm">
+              {userDatasets.length === 0 && (
+                <div className="text-xs text-slate-500 italic">{translate('controls.no.datasets') || 'No datasets yet'}</div>
+              )}
+              {userDatasets.map(ds => (
+                <div key={ds.id} className="flex items-center justify-between gap-2 group">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-emerald-900 truncate max-w-[120px]" title={ds.name}>{ds.name}</span>
+                    <span className="text-[10px] text-emerald-700/70">{ds.count} pts</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={datasetVisibility[ds.id] !== false}
+                      onCheckedChange={(val) => onToggleDataset?.(ds.id, val)}
+                      aria-label={`Toggle ${ds.name}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDataset?.(ds.id)}
+                      title={translate('controls.delete.dataset')}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-700 hover:text-red-600 p-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                        <path d="M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <Button
             variant="outline"
@@ -146,7 +218,7 @@ const ControlsContainer = ({
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
+  <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
           <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -236,6 +308,31 @@ const ControlsContainer = ({
                     </Card>
         </CardContent>
       </Card>
+      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{translate('controls.name.upload') || 'Name your dataset'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <label className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+              {translate('controls.dataset.name') || 'Dataset Name'}
+            </label>
+            <Input
+              autoFocus
+              value={datasetName}
+              onChange={(e) => setDatasetName(e.target.value)}
+              placeholder={translate('controls.dataset.name.placeholder') || 'e.g. My Offers February'}
+            />
+            {pendingFile && (
+              <p className="text-[11px] text-slate-500">{translate('controls.original.file') || 'Original file'}: {pendingFile.name}</p>
+            )}
+          </div>
+          <DialogFooter className="mt-2 space-x-2 justify-end sm:flex-row">
+            <Button variant="outline" size="sm" onClick={cancelUpload}>{translate('controls.cancel') || 'Cancel'}</Button>
+            <Button size="sm" onClick={confirmUpload}>{translate('controls.upload') || 'Upload'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
