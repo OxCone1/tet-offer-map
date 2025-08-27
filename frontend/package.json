@@ -9,8 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "heroku-start": "node scripts/heroku-start.cjs",
-    "postinstall": "npm run build"
+    "heroku-start": "node scripts/heroku-start.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.12",
