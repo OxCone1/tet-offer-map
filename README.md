@@ -7,7 +7,7 @@ Full workflow to extract Latvian Tet internet availability data and visualize it
 ## Contents
 | Folder | Purpose |
 |--------|---------|
-| [`data-extractor/`](data-extractor/README.md) | Puppeteer scraper: enriches OSM address features with Tet offers → NDJSON output. |
+| [`data-extractor/`](data-extractor/README.md) | Scrapers (API-first + Puppeteer fallback) enriching OSM addresses with Tet offers → NDJSON. |
 | [`frontend/`](frontend/README.md) | React + Vite application (Leaflet map, search, filters, sectors, uploads). |
 
 ## High‑Level Flow
@@ -38,11 +38,13 @@ out skel qt;
 
 Export → Download → GeoJSON → save as `data-extractor/export.geojson`.
 
-## 3. Run Scraper
+## 3. Run Scraper (API Preferred)
 ```powershell
 cd data-extractor
 npm install          # first time
-npm start            # writes tet_offers.ndjson incrementally
+npm run api          # fastest API mode → writes tet_offers.ndjson
+# (fallback if API rate-limited or changed)
+npm run puppeteer    # slower browser automation
 ```
 Outputs:
 - `tet_offers.ndjson` – one JSON object per line (properties + offers + geometry)
@@ -81,7 +83,7 @@ Ensure you copy `tet_offers.ndjson` into the deployed `dist/` (or keep it beside
 ## 6. Technology Stack
 | Area | Tech | Notes |
 |------|------|-------|
-| Scraper | Node.js, Puppeteer, node-fetch, YAML | Shadow DOM traversal for Tet availability page. |
+| Scraper | Node.js, Axios (API) + Puppeteer (fallback), node-fetch, YAML | API first; browser only if needed. |
 | Frontend Core | React 19, Vite, TypeScript (partial) | Fast dev + modern JSX runtime. |
 | Styling | Tailwind CSS 4, shadcn/ui patterns (Radix primitives + class-variance-authority + tailwind-merge + lucide-react icons) | Utility-first styling with composable accessible components. |
 | Map | Leaflet, custom clustering (DBSCAN + convex hull) | No heavyweight server; client clustering. |
@@ -114,7 +116,8 @@ User uploaded Feature requirement:
 ## 8. Common Tasks
 | Goal | Commands |
 |------|----------|
-| Fresh scrape + run frontend | `npm --prefix data-extractor start` → copy file → `npm --prefix frontend run dev` |
+| Fresh scrape + run frontend | `npm --prefix data-extractor run api` → copy file → `npm --prefix frontend run dev` |
+| Recovery (failed only, API) | `npm --prefix data-extractor run api:validate` |
 | Clean & rescrape | Delete `data-extractor/progress.json` then rerun scraper |
 | Update dataset in running dev server | Re-copy NDJSON into `frontend/public/` and refresh browser |
 

@@ -39,17 +39,45 @@ out skel qt;
 ### Picking a Bounding Box
 Use a rectangle in Overpass Turbo that tightly wraps the target settlement / district. Smaller areas reduce the risk of hitting Overpass rate limits and keep scraping time manageable. For large regions, split into multiple adjacent boxes and run sequentially—append outputs (the script will skip already processed IDs if `progress.json` is kept between runs).
 
-## 2. Run the Scraper
-From this `data-extractor` directory:
+## 2. Run the Scraper (API First, Puppeteer Fallback)
+Two implementations now exist:
+
+1. Fast API mode (`api.js`) – hits Tet's public JSON endpoints directly. MUCH faster & lighter.
+2. Legacy Puppeteer browser mode (`index.js`) – full page automation, only needed if the API gets rate‑limited or changes.
+
+Scripts (see `package.json`):
+
+| Command | What it does |
+|---------|---------------|
+| `npm run api` | Run fast API scraper (recommended default). |
+| `npm run api:validate` | Reprocess only previously failed addresses (error recovery) using API mode. |
+| `npm run puppeteer` | Run browser (slower) scraper. |
+| `npm run puppeteer:validate` | Recovery pass with Puppeteer for failed items. |
+
+Install dependencies once, then prefer API:
 
 ```powershell
-npm install   # first time only
-npm start     # begins processing export.geojson
+npm install          # first time only
+npm run api          # fastest path – streams tet_offers.ndjson
 ```
 
-While running you will see progress in the console. You can stop at any time (Ctrl+C) and restart later; processed IDs are remembered.
+If you start hitting API rate limits (many 429 / gateway failures), pause a bit or fall back:
 
-## 3. Output Files
+```powershell
+npm run puppeteer    # slower but different request pattern; can bypass temporary API throttling
+```
+
+Validation / recovery only (process entries that previously failed):
+
+```powershell
+npm run api:validate
+# or
+npm run puppeteer:validate
+```
+
+While running you will see progress. Stop any time (Ctrl+C) and restart; processed IDs are remembered across BOTH modes because they share `progress.json`.
+
+## 3. Output Files (Shared Between API & Puppeteer)
 | File | Purpose |
 |------|---------|
 | `tet_offers.ndjson` | One JSON object per line: original minimal OSM props + geometry + fetched offers. |
@@ -64,11 +92,12 @@ Address strings are composed from these tags when present: `addr:street`, `addr:
 ## 5. Restart / Resume
 If the script crashes, fix the cause (selectors, network, etc.) and run `npm start` again. Already processed IDs (those in `progress.json`) will be skipped. To force a full re-run, delete `progress.json` and (optionally) the output NDJSON files first.
 
-## 6. Common Issues
+## 6. Common Issues (API vs Browser)
 | Issue | Hint |
 |-------|------|
 | Empty results | Inspect address formatting; verify the feature actually exists on Tet's site. |
-| Many rapid failures | Tet layout change: update selectors in `index.js`. |
+| Many rapid failures (API) | Temporary throttling – reduce batch (`--batch=2`) or switch to Puppeteer fallback. |
+| Many rapid failures (Puppeteer) | Tet layout / shadow DOM change: update selectors in `index.js`. |
 | Overpass export too large | Split the area into smaller bounding boxes and merge NDJSON outputs later. |
 | Memory usage grows | Run in smaller batches; archive older NDJSON lines. |
 | Puppeteer Chrome not found / download error | See "Puppeteer troubleshooting" below. |
@@ -80,12 +109,19 @@ The frontend expects `tet_offers.ndjson` at build/deploy time. After scraping, c
 Open dev tools on Tet availability page, locate the nested shadow roots used to display address and offers, and update the query logic in `index.js`. Keep selectors as narrow as possible to avoid false matches.
 
 ## 9. Safety / Rate Limits
-Be polite: avoid huge bounding boxes; respect delays already in the script (add random jitter if necessary). Consider pausing between batches.
+API Mode:
+- Default concurrency is a modest batch size (see `DEFAULT_BATCH` in `api.js`). Override with `--batch=<n>` or `BATCH_SIZE` env var.
+- If you begin to see repeated errors (timeouts, 429s), lower batch or pause 1–2 minutes.
+
+Puppeteer Mode:
+- Heavier; keep multiple parallel browser sessions to a minimum.
+- You can still tune internal pacing if needed (not exposed yet – see TODO section).
 
 ## 10. Next Improvements (To‑Do)
-- Configurable concurrency / throttling
-- Automatic selector fallback heuristics
-- Optional CSV export
+- Unified CLI wrapper selecting API → fallback automatically
+- Smarter dynamic backoff when API rate‑limited
+- Automatic selector fallback heuristics (Puppeteer)
+- Optional CSV / Parquet export
 - CLI flags for bounding box filtering
 
 ## Puppeteer troubleshooting
@@ -121,4 +157,4 @@ These steps should resolve most Chrome download / detection issues when running 
 ---
 Need a new batch? Just create a fresh bounding box in Overpass Turbo, export, replace `export.geojson`, run again.
 
-Happy scraping.
+Happy scraping (API first, browser only when needed).

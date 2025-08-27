@@ -7,11 +7,14 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "cleanup-errors": "node index.js --validate",
+    "puppeteer": "node index.js",
+    "puppeteer:validate": "node index.js --validate",
+    "api": "node api.js",
+    "api:validate": "node api.js --validate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "axios": "^1.11.0",
     "node-fetch": "^3.3.2",
     "puppeteer": "^24.17.0",
     "yaml": "^2.8.1"
