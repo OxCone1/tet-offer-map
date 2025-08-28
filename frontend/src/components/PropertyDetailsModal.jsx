@@ -334,7 +334,7 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
           <SheetTitle className="sr-only">{translate("property.details")}</SheetTitle>
           <SheetDescription className="sr-only">{translate("property.details.description")}</SheetDescription>
         </div>
-        <div className={`h-full overflow-y-auto ${isMobile ? "pb-4" : "pb-6"}`}>
+        <div className={`h-full overflow-y-auto ${isMobile ? "pb-4" : "pb-6"} no-scrollbar`}>
           <ModalContent />
         </div>
       </SheetContent>
