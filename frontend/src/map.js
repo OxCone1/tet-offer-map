@@ -21,10 +21,15 @@ export class MapManager {
    * Initialize the map
    */
   init() {
-    // Initialize map centered on Riga, Latvia
+    // Try restore last view from localStorage
+    const restored = this._loadPersistedView();
+    const defaultCenter = [56.94918736961807, 24.111557006835938];
+    const defaultZoom = 12;
+
+    // Initialize map (use restored view if available)
     this.map = L.map(this.containerId, {
-      center: [57.018526, 24.263647],
-      zoom: 14,
+      center: restored ? [restored.lat, restored.lng] : defaultCenter,
+      zoom: restored ? (restored.zoom || defaultZoom) : defaultZoom,
       zoomControl: true,
       zoomDelta: 1,
       zoomSnap: 1
@@ -57,11 +62,13 @@ export class MapManager {
       console.log('Map zoom changed:', z);
       this._restyleVisibleLayers();
       if (this._autoLogBounds) this.logVisibleBounds('zoomend');
+      this._persistView();
     });
 
     // Log bounds after finished moving (panning or programmatic setView/fitBounds)
     this.map.on('moveend', () => {
       if (this._autoLogBounds) this.logVisibleBounds('moveend');
+      this._persistView();
     });
 
     // Expose lightweight debug helpers for prototyping (non-production)
@@ -76,7 +83,9 @@ export class MapManager {
         manager: this,
         enableAutoBounds: () => { this.setAutoLogBounds(true); },
         disableAutoBounds: () => { this.setAutoLogBounds(false); },
-        toggleAutoBounds: () => { this.setAutoLogBounds(!this._autoLogBounds); }
+        toggleAutoBounds: () => { this.setAutoLogBounds(!this._autoLogBounds); },
+        getViewState: () => this._loadPersistedView(),
+        clearViewState: () => { localStorage.removeItem('mapViewState'); console.log('Cleared persisted map view'); }
       };
     }
   }
@@ -671,5 +680,30 @@ export class MapManager {
     this._autoLogBounds = !!enabled;
     console.log('Auto bounds logging:', this._autoLogBounds ? 'ENABLED' : 'DISABLED');
     if (this._autoLogBounds) this.logVisibleBounds('init');
+  }
+
+  // ---------------------- View persistence ----------------------
+  _persistView() {
+    if (!this.map) return;
+    try {
+      const c = this.map.getCenter();
+      const z = this.map.getZoom();
+      const payload = { lat: c.lat, lng: c.lng, zoom: z, ts: Date.now() };
+      localStorage.setItem('mapViewState', JSON.stringify(payload));
+  } catch {
+      // Swallow errors (e.g., private mode)
+    }
+  }
+
+  _loadPersistedView() {
+    try {
+      const raw = localStorage.getItem('mapViewState');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') return parsed;
+      return null;
+  } catch {
+      return null;
+    }
   }
 }
