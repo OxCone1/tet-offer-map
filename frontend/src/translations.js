@@ -48,6 +48,14 @@ export const translations = {
         "property.technical.info": "Technical Information",
         "property.address": "Address",
         "property.connection.type": "Connection Type",
+    "property.per.month.short": "/mo",
+    "property.contract.term": "{months} mo contract",
+    "property.contract.unlimited": "No fixed term",
+    "property.main.features": "Key features:",
+    "property.features.more": "+{count} more",
+    "property.offer.selected": "Selected",
+    "property.offer.select": "Select",
+    "property.choose.best": "Pick the offer that suits you best",
 
         // Controls
         "controls.data.layers": "Data Layers",
@@ -145,6 +153,14 @@ export const translations = {
         "property.technical.info": "Техническая информация",
         "property.address": "Адрес",
         "property.connection.type": "Тип подключения",
+    "property.per.month.short": "/мес",
+    "property.contract.term": "Договор на {months} мес.",
+    "property.contract.unlimited": "Без срока",
+    "property.main.features": "Основные особенности:",
+    "property.features.more": "+{count} ещё",
+    "property.offer.selected": "Выбрано",
+    "property.offer.select": "Выбрать",
+    "property.choose.best": "Выберите наиболее подходящее предложение",
 
         // Controls
         "controls.data.layers": "Слои данных",
@@ -242,6 +258,14 @@ export const translations = {
         "property.technical.info": "Tehniskā informācija",
         "property.address": "Adrese",
         "property.connection.type": "Savienojuma tips",
+    "property.per.month.short": "/mēn",
+    "property.contract.term": "{months} mēn. līgums",
+    "property.contract.unlimited": "Bez līguma ierobežojumiem",
+    "property.main.features": "Galvenās īpašības:",
+    "property.features.more": "+{count} vairāk",
+    "property.offer.selected": "Izvēlēts",
+    "property.offer.select": "Izvēlēties",
+    "property.choose.best": "Izvēlieties sev piemērotāko piedāvājumu",
 
         // Controls
         "controls.data.layers": "Datu slāņi",

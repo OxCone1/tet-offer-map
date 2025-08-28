@@ -177,6 +177,6 @@ export const DataUtils = {
   formatPrice(pricePerMonth = 'EUR') {
     if (!pricePerMonth && pricePerMonth !== 0) return 'N/A';
     const numPrice = parseFloat(pricePerMonth);
-    return isNaN(numPrice) ? pricePerMonth : `€${numPrice.toFixed(2)}/mēn.`;
+    return isNaN(numPrice) ? pricePerMonth : `€${numPrice.toFixed(2)}`;
   }
 };
