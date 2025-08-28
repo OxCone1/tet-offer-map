@@ -13,6 +13,7 @@ export class MapManager {
     this.sectorsLayer = null;
     this.sectorsVisible = false;
     this.typeFilters = new Set(); // empty => show all
+    this._autoLogBounds = false; // disabled by default; can be toggled for prototyping
     this.init();
   }
 
@@ -55,7 +56,29 @@ export class MapManager {
       const z = this.map.getZoom ? this.map.getZoom() : null;
       console.log('Map zoom changed:', z);
       this._restyleVisibleLayers();
+      if (this._autoLogBounds) this.logVisibleBounds('zoomend');
     });
+
+    // Log bounds after finished moving (panning or programmatic setView/fitBounds)
+    this.map.on('moveend', () => {
+      if (this._autoLogBounds) this.logVisibleBounds('moveend');
+    });
+
+    // Expose lightweight debug helpers for prototyping (non-production)
+    if (typeof window !== 'undefined') {
+      // On-demand logging of current visible bounds
+      window.logMapBounds = () => this.logVisibleBounds();
+      // Structured access for deeper inspection
+      window.__mapDebug = {
+        logBounds: () => this.logVisibleBounds(),
+        getBounds: () => this.getVisibleBounds(),
+        map: this.map,
+        manager: this,
+        enableAutoBounds: () => { this.setAutoLogBounds(true); },
+        disableAutoBounds: () => { this.setAutoLogBounds(false); },
+        toggleAutoBounds: () => { this.setAutoLogBounds(!this._autoLogBounds); }
+      };
+    }
   }
 
   /**
@@ -593,5 +616,60 @@ export class MapManager {
     if (this.map && typeof handler === 'function') {
       this.map.off('move', handler);
     }
+  }
+
+  /**
+   * Return detailed information about current visible map bounds.
+   * Useful for prototyping dynamic data loading based on viewport.
+   * @returns {object|null} bounds info or null if map not ready
+   */
+  getVisibleBounds() {
+    if (!this.map) return null;
+    const b = this.map.getBounds();
+    return {
+      north: b.getNorth(),
+      south: b.getSouth(),
+      east: b.getEast(),
+      west: b.getWest(),
+      northWest: b.getNorthWest(),
+      northEast: b.getNorthEast(),
+      southWest: b.getSouthWest(),
+      southEast: b.getSouthEast(),
+      center: b.getCenter(),
+      zoom: this.map.getZoom()
+    };
+  }
+
+  /**
+   * Console-log current map bounds & corners in a compact structured format.
+   * Returns same object as getVisibleBounds() for chaining / inspection.
+   * @param {string} tag optional label
+   */
+  logVisibleBounds(tag = 'MapBounds') {
+    const info = this.getVisibleBounds();
+    if (!info) {
+      console.log(`${tag}: map not initialized`);
+      return null;
+    }
+    const payload = {
+      bbox: { west: info.west, south: info.south, east: info.east, north: info.north },
+      corners: {
+        nw: info.northWest,
+        ne: info.northEast,
+        sw: info.southWest,
+        se: info.southEast
+      },
+      center: info.center,
+      zoom: info.zoom
+    };
+    console.log(tag + ':', payload);
+    return info;
+  }
+
+  /** Enable/disable automatic bounds logging on move/zoom */
+  setAutoLogBounds(enabled) {
+    this._autoLogBounds = !!enabled;
+    console.log('Auto bounds logging:', this._autoLogBounds ? 'ENABLED' : 'DISABLED');
+    if (this._autoLogBounds) this.logVisibleBounds('init');
   }
 }
