@@ -111,12 +111,12 @@ export const useData = (storageManager) => {
 
     const fetchTetData = async () => {
       try {
-        console.log('Loading TET data...');
+        // console.log('Loading TET data...');
         const response = await axios.get('/tet_offers.ndjson');
         const data = DataUtils.parseNDJSON(response.data);
         setTetData(data);
         tetDataLoaded.current = true;
-        console.log(`Loaded ${data.length} TET offers`);
+        // console.log(`Loaded ${data.length} TET offers`);
       } catch (err) {
         console.error('Error loading TET data:', err);
         setError(err);
@@ -146,7 +146,7 @@ export const useData = (storageManager) => {
   const data = entries.flatMap(entry => entry.data);
   setUserData(data);
   setUserDataEntries(entries);
-  console.log(`Loaded ${data.length} user data features across ${entries.length} datasets`);
+  // console.log(`Loaded ${data.length} user data features across ${entries.length} datasets`);
       } catch (err) {
         console.error('Error loading user data:', err);
       } finally {

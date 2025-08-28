@@ -43,9 +43,9 @@ function NavigationContent({
     onDeleteDataset,
 }) {
     const translate = useTranslate()
-    
+
     return (
-        <div className="h-full flex flex-col">
+        <div className="flex flex-col flex-1 min-h-0">
             {/* Navigation Tabs */}
             <div className="flex border-b border-slate-200 bg-slate-50 rounded-t-lg">
                 <Button
@@ -75,7 +75,7 @@ function NavigationContent({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white">
+            <div className="flex-1 overflow-y-auto bg-white min-h-0 ">
                 {activeTab === "search" && (
                     <div className="p-4">
                         <div className="mb-4">
@@ -129,6 +129,8 @@ function NavigationContent({
                         />
                     </div>
                 )}
+                {/* Bottom spacer to ensure last element isn't clipped under safe-area / gesture bar */}
+                {/* <div className="h-4" /> */}
             </div>
         </div>
     );
@@ -178,7 +180,7 @@ const NavigationPanel = ({
         }
     }
 
-    
+
 
     if (isMobile) {
         return (
@@ -202,36 +204,36 @@ const NavigationPanel = ({
                                     {translate('nav.map.tools')}
                                 </SheetTitle>
                             </SheetHeader>
-                                                        <NavigationContent
-                                                            activeTab={activeTab}
-                                                            setActiveTab={setActiveTab}
-                                                            searchQuery={searchQuery}
-                                                            searchResults={searchResults}
-                                                            showResults={showResults}
-                                                            onSearchInput={onSearchInput}
-                                                            onSearchResultSelect={onSearchResultSelect}
-                                                            onClearResults={onClearResults}
-                                                            showTetData={showTetData}
-                                                            showUserData={showUserData}
-                                                            userDataCount={userDataCount}
-                                                            onToggleTetData={onToggleTetData}
-                                                            onToggleUserData={onToggleUserData}
-                                                            onFileUpload={onFileUpload}
-                                                            showSectors={showSectors}
-                                                            onToggleSectors={onToggleSectors}
-                                                            sectorsRadius={sectorsRadius}
-                                                            onChangeSectorsRadius={onChangeSectorsRadius}
-                                                            sectorsMinPts={sectorsMinPts}
-                                                            onChangeSectorsMinPts={onChangeSectorsMinPts}
-                                                            typeFilters={typeFilters}
-                                                            onChangeTypeFilters={onChangeTypeFilters}
-                                                            tetData={tetData}
-                                                            userData={userData}
-                                                            userDatasets={userDatasets}
-                                                            datasetVisibility={datasetVisibility}
-                                                            onToggleDataset={onToggleDataset}
-                                                            onDeleteDataset={onDeleteDataset}
-                                                        />
+                            <NavigationContent
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                searchQuery={searchQuery}
+                                searchResults={searchResults}
+                                showResults={showResults}
+                                onSearchInput={onSearchInput}
+                                onSearchResultSelect={onSearchResultSelect}
+                                onClearResults={onClearResults}
+                                showTetData={showTetData}
+                                showUserData={showUserData}
+                                userDataCount={userDataCount}
+                                onToggleTetData={onToggleTetData}
+                                onToggleUserData={onToggleUserData}
+                                onFileUpload={onFileUpload}
+                                showSectors={showSectors}
+                                onToggleSectors={onToggleSectors}
+                                sectorsRadius={sectorsRadius}
+                                onChangeSectorsRadius={onChangeSectorsRadius}
+                                sectorsMinPts={sectorsMinPts}
+                                onChangeSectorsMinPts={onChangeSectorsMinPts}
+                                typeFilters={typeFilters}
+                                onChangeTypeFilters={onChangeTypeFilters}
+                                tetData={tetData}
+                                userData={userData}
+                                userDatasets={userDatasets}
+                                datasetVisibility={datasetVisibility}
+                                onToggleDataset={onToggleDataset}
+                                onDeleteDataset={onDeleteDataset}
+                            />
                         </SheetContent>
                     </Sheet>
                 </div>
@@ -246,8 +248,8 @@ const NavigationPanel = ({
                 className={`fixed left-0 top-0 h-full z-40 transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
             >
-                <Card className="h-full w-96 rounded-none shadow-xl border-r border-slate-200">
-                    <CardContent className="p-0 h-full">
+                <Card className="h-full w-96 rounded-none shadow-xl border-r border-slate-200 pt-0 pb-0">
+                    <CardContent className="p-0 h-full flex flex-col min-h-0">
                         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-slate-50">
                             <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                                 <Map className="h-5 w-5 text-blue-600" />
@@ -262,36 +264,36 @@ const NavigationPanel = ({
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
-                                                <NavigationContent
-                                                    activeTab={activeTab}
-                                                    setActiveTab={setActiveTab}
-                                                    searchQuery={searchQuery}
-                                                    searchResults={searchResults}
-                                                    showResults={showResults}
-                                                    onSearchInput={onSearchInput}
-                                                    onSearchResultSelect={onSearchResultSelect}
-                                                    onClearResults={onClearResults}
-                                                    showTetData={showTetData}
-                                                    showUserData={showUserData}
-                                                    userDataCount={userDataCount}
-                                                    onToggleTetData={onToggleTetData}
-                                                    onToggleUserData={onToggleUserData}
-                                                    onFileUpload={onFileUpload}
-                                                    showSectors={showSectors}
-                                                    onToggleSectors={onToggleSectors}
-                                                    sectorsRadius={sectorsRadius}
-                                                    onChangeSectorsRadius={onChangeSectorsRadius}
-                                                    sectorsMinPts={sectorsMinPts}
-                                                    onChangeSectorsMinPts={onChangeSectorsMinPts}
-                                                    typeFilters={typeFilters}
-                                                    onChangeTypeFilters={onChangeTypeFilters}
-                                                    tetData={tetData}
-                                                    userData={userData}
-                                                    userDatasets={userDatasets}
-                                                    datasetVisibility={datasetVisibility}
-                                                    onToggleDataset={onToggleDataset}
-                                                    onDeleteDataset={onDeleteDataset}
-                                                />
+                        <NavigationContent
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            searchQuery={searchQuery}
+                            searchResults={searchResults}
+                            showResults={showResults}
+                            onSearchInput={onSearchInput}
+                            onSearchResultSelect={onSearchResultSelect}
+                            onClearResults={onClearResults}
+                            showTetData={showTetData}
+                            showUserData={showUserData}
+                            userDataCount={userDataCount}
+                            onToggleTetData={onToggleTetData}
+                            onToggleUserData={onToggleUserData}
+                            onFileUpload={onFileUpload}
+                            showSectors={showSectors}
+                            onToggleSectors={onToggleSectors}
+                            sectorsRadius={sectorsRadius}
+                            onChangeSectorsRadius={onChangeSectorsRadius}
+                            sectorsMinPts={sectorsMinPts}
+                            onChangeSectorsMinPts={onChangeSectorsMinPts}
+                            typeFilters={typeFilters}
+                            onChangeTypeFilters={onChangeTypeFilters}
+                            tetData={tetData}
+                            userData={userData}
+                            userDatasets={userDatasets}
+                            datasetVisibility={datasetVisibility}
+                            onToggleDataset={onToggleDataset}
+                            onDeleteDataset={onDeleteDataset}
+                        />
                     </CardContent>
                 </Card>
             </div>

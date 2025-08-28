@@ -34,37 +34,37 @@ const ControlsContainer = ({
   onToggleDataset,
   onDeleteDataset
 }) => {
-    const translate = useTranslate()
-    const fileInputRef = useRef(null)
-    const [pendingFile, setPendingFile] = useState(null)
-    const [datasetName, setDatasetName] = useState("")
-    const [showNameDialog, setShowNameDialog] = useState(false)
-    const [showDatasets, setShowDatasets] = useState(false)
+  const translate = useTranslate()
+  const fileInputRef = useRef(null)
+  const [pendingFile, setPendingFile] = useState(null)
+  const [datasetName, setDatasetName] = useState("")
+  const [showNameDialog, setShowNameDialog] = useState(false)
+  const [showDatasets, setShowDatasets] = useState(false)
 
-    // Calculate available connection types from visible data layers
-    const availableTypes = useMemo(() => {
-        const types = new Set();
-        
-        if (showTetData && tetData) {
-            tetData.forEach(property => {
-                if (property.offers && property.offers[0]) {
-                    const norm = DataUtils.normalizeConnectionType(property.offers[0].connectionType);
-                    if (norm) types.add(norm);
-                }
-            });
+  // Calculate available connection types from visible data layers
+  const availableTypes = useMemo(() => {
+    const types = new Set();
+
+    if (showTetData && tetData) {
+      tetData.forEach(property => {
+        if (property.offers && property.offers[0]) {
+          const norm = DataUtils.normalizeConnectionType(property.offers[0].connectionType);
+          if (norm) types.add(norm);
         }
-        
-        if (showUserData && userData) {
-            userData.forEach(feature => {
-                if (feature.properties && feature.properties.connection_type) {
-                    const norm = DataUtils.normalizeConnectionType(feature.properties.connection_type);
-                    if (norm) types.add(norm);
-                }
-            });
+      });
+    }
+
+    if (showUserData && userData) {
+      userData.forEach(feature => {
+        if (feature.properties && feature.properties.connection_type) {
+          const norm = DataUtils.normalizeConnectionType(feature.properties.connection_type);
+          if (norm) types.add(norm);
         }
-        
-        return Array.from(types).sort();
-    }, [showTetData, tetData, showUserData, userData]);  const handleUploadClick = () => {
+      });
+    }
+
+    return Array.from(types).sort();
+  }, [showTetData, tetData, showUserData, userData]); const handleUploadClick = () => {
     fileInputRef.current?.click()
   }
 
@@ -96,9 +96,9 @@ const ControlsContainer = ({
   }
 
   return (
-    <div className="controls-container space-y-6">
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+    <div className="controls-container space-y-4 h-full">
+      <Card className="border-slate-200 shadow-sm overflow-hidden py-0 gap-0">
+        <CardHeader className="[.border-b]:pb-2 pt-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
           <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             {translate('controls.data.layers')}
@@ -218,8 +218,8 @@ const ControlsContainer = ({
         </CardContent>
       </Card>
 
-  <Card className="border-slate-200 shadow-sm overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+      <Card className="border-slate-200 shadow-sm overflow-hidden py-0 gap-0">
+        <CardHeader className="[.border-b]:pb-2 pt-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
           <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
             {translate('controls.sectors')}
@@ -276,36 +276,36 @@ const ControlsContainer = ({
               />
             </div>
           </div>
-                    <Card className="mt-3">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">{translate('controls.connection.types')}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        {availableTypes.map(t => (
-                          <div key={t} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`t-${t}`}
-                              checked={typeFilters.includes(t)}
-                              onCheckedChange={(checked) => {
-                                const newFilters = checked 
-                                  ? [...typeFilters, t]
-                                  : typeFilters.filter(x => x !== t);
-                                onChangeTypeFilters?.(newFilters);
-                              }}
-                            />
-                            <Label htmlFor={`t-${t}`} className="capitalize">
-                              {translate(`connection.${t.toLowerCase()}`) || t}
-                            </Label>
-                          </div>
-                        ))}
-                        {availableTypes.length === 0 && (
-                          <div className="text-xs text-slate-400 italic">{translate('controls.connection.no.types')}</div>
-                        )}
-                        {availableTypes.length > 0 && (
-                          <div className="text-xs text-slate-500">{translate('controls.connection.toggle.hint')}</div>
-                        )}
-                      </CardContent>
-                    </Card>
+          <Card className="mt-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">{translate('controls.connection.types')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {availableTypes.map(t => (
+                <div key={t} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`t-${t}`}
+                    checked={typeFilters.includes(t)}
+                    onCheckedChange={(checked) => {
+                      const newFilters = checked
+                        ? [...typeFilters, t]
+                        : typeFilters.filter(x => x !== t);
+                      onChangeTypeFilters?.(newFilters);
+                    }}
+                  />
+                  <Label htmlFor={`t-${t}`} className="capitalize">
+                    {translate(`connection.${t.toLowerCase()}`) || t}
+                  </Label>
+                </div>
+              ))}
+              {availableTypes.length === 0 && (
+                <div className="text-xs text-slate-400 italic">{translate('controls.connection.no.types')}</div>
+              )}
+              {availableTypes.length > 0 && (
+                <div className="text-xs text-slate-500">{translate('controls.connection.toggle.hint')}</div>
+              )}
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
       <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>

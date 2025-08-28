@@ -30,9 +30,9 @@ export class MapManager {
     });
 
     // Testing: log current zoom level on init
-    if (this.map && this.map.getZoom) {
-      console.log('Map zoom level (init):', this.map.getZoom());
-    }
+    // if (this.map && this.map.getZoom) {
+    //   console.log('Map zoom level (init):', this.map.getZoom());
+    // }
 
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {

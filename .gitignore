@@ -4,3 +4,5 @@
 data-extractor/tet_offers.ndjson
 data-extractor/tet_errors.ndjson
 data-extractor/progress.json
+data-extractor/export.geojson
+data-extractor/export.geojson.old

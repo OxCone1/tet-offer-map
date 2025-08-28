@@ -133,15 +133,15 @@ export const DataUtils = {
       'fiber': isUserData ? '#059669' : '#2E7D32', // emerald for user, sky for TET (trustworthy blue)
       'fiber (optikas)': isUserData ? '#059669' : '#2E7D32',
       'optikas': isUserData ? '#059669' : '#2E7D32',
-      'dsl': isUserData ? '#d97706' : '#4682B4', // amber
-      'dsl/vdsl': isUserData ? '#d97706' : '#4682B4',
-      'vdsl': isUserData ? '#d97706' : '#4682B4',
+      'dsl': isUserData ? '#D7AD2C' : '#E69A17', // amber
+      'dsl/vdsl': isUserData ? '#D7AD2C' : '#E69A17',
+      'vdsl': isUserData ? '#D7AD2C' : '#E69A17',
       'cable': isUserData ? '#7c3aed' : '#8b5cf6', // violet
-      'mobile': isUserData ? '#dc2626' : '#E69A17', // red
-      'mobile (4g/5g)': isUserData ? '#dc2626' : '#E69A17',
-      '4g': isUserData ? '#dc2626' : '#E69A17',
-      '5g': isUserData ? '#dc2626' : '#E69A17',
-      'wireless': isUserData ? '#dc2626' : '#E69A17',
+      'mobile': isUserData ? '#9B4429' : '#B84F0E', // red
+      'mobile (4g/5g)': isUserData ? '#9B4429' : '#B84F0E',
+      '4g': isUserData ? '#9B4429' : '#B84F0E',
+      '5g': isUserData ? '#9B4429' : '#B84F0E',
+      'wireless': isUserData ? '#9B4429' : '#B84F0E',
       'satellite': isUserData ? '#0891b2' : '#06b6d4' // cyan
     };
     

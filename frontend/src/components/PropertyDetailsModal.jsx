@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion"
-import { Info, Wifi, Euro, Zap, Shield, Star, MapPin, Crown, Clock, Cable, Smartphone, Router } from "lucide-react"
+import { Info, Wifi, Euro, Zap, Shield, Star, MapPin, Crown, Clock, Cable, Smartphone, Router, Home, Hash, Building2, } from "lucide-react"
 import { useTranslate } from "../hooks/useTranslation.jsx"
 
 const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClose }) => {
@@ -40,6 +40,75 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
       return <Router className="h-5 w-5 text-orange-600" />
     }
     return <Wifi className="h-5 w-5 text-blue-600" />
+  }
+
+  const AddressDisplay = ({ properties }) => {
+    const addressProps = properties.properties || properties || {}
+    const street = addressProps["addr:street"]
+    const houseNumber = addressProps["addr:housenumber"]
+    const city = addressProps["addr:city"]
+    const postcode = addressProps["addr:postcode"]
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center flex-start gap-3 text-slate-600 mb-3">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            <span className="text-sm font-medium">{translate('property.address')}</span>
+          </div>
+          <div
+            className={`inline-flex items-center gap-2 px-2 py-1 rounded-full text-xs font-semibold ${sourceBgColor} ${sourceColor} border`}
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+            {dataSource}
+          </div>
+        </div>
+        <div className="grid gap-2">
+          <div className="flex gap-2">
+            {street && (
+              <div className="flex-1 bg-gradient-to-r from-blue-50 to-blue-100 rounded-md px-3 py-2 border border-blue-200">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Home className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">{translate('property.address.street')}</span>
+                </div>
+                <p className="text-sm font-semibold text-blue-900">{street}</p>
+              </div>
+            )}
+
+            {houseNumber && (
+              <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-md px-3 py-2 border border-emerald-200 min-w-[70px]">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Hash className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700 uppercase tracking-wide">{translate('property.address.number')}</span>
+                </div>
+                <p className="text-sm font-semibold text-emerald-900 text-center">{houseNumber}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {city && (
+              <div className="flex-1 bg-gradient-to-r from-purple-50 to-purple-100 rounded-md px-3 py-2 border border-purple-200">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Building2 className="h-3.5 w-3.5 text-purple-600" />
+                  <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">{translate('property.address.city')}</span>
+                </div>
+                <p className="text-sm font-semibold text-purple-900">{city}</p>
+              </div>
+            )}
+
+            {postcode && (
+              <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-md px-3 py-2 border border-amber-200 min-w-[90px]">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                  <span className="text-xs font-medium text-amber-700 uppercase tracking-wide">{translate('property.address.postcode')}</span>
+                </div>
+                <p className="text-sm font-semibold text-amber-900 text-center">{postcode}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Fallback speed display for mobile technologies without explicit speed info
@@ -97,7 +166,7 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
           <div className="absolute -top-2 -right-2 z-10">
             <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold px-2 py-0.5 text-xs shadow-lg">
               <Crown className="h-3 w-3 mr-1" />
-              PROMO
+              {translate('property.promo.badge')}
             </Badge>
           </div>
         )}
@@ -120,7 +189,7 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
                 <div className="flex items-center justify-center mb-1">
                   <Zap className="h-3 w-3 text-green-600" />
                 </div>
-                <p className="text-xs font-medium text-green-700 mb-1">Ātrums</p>
+                <p className="text-xs font-medium text-green-700 mb-1">{translate('property.speed')}</p>
                 <p className="text-sm font-bold text-green-800">
                   {formatOfferSpeed(offer)}
                 </p>
@@ -130,9 +199,9 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
                 <div className="flex items-center justify-center mb-1">
                   <Euro className="h-3 w-3 text-blue-600" />
                 </div>
-                <p className="text-xs font-medium text-blue-700 mb-1">Cena</p>
+                <p className="text-xs font-medium text-blue-700 mb-1">{translate('property.price')}</p>
                 <p className="text-sm font-bold text-blue-800">
-                  {DataUtils.formatPrice(offer.pricePerMonthEur || offer.price)}
+                  {DataUtils.formatPrice(offer.pricePerMonthEur || offer.price)}{translate('property.per.month.short')}
                 </p>
               </div>
             </div>
@@ -214,20 +283,7 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
         <div className={`relative ${isMobile ? "p-4" : "border border-slate-200 p-6"}`}>
-          <div className="flex items-start gap-3">
-            <MapPin className="h-5 w-5 text-slate-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold text-slate-900 leading-tight mb-2`}>
-                {properties.address}
-              </h2>
-              <div
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${sourceBgColor} ${sourceColor} border`}
-              >
-                <div className="w-2 h-2 rounded-full bg-current"></div>
-                {dataSource}
-              </div>
-            </div>
-          </div>
+          <AddressDisplay properties={properties} />
         </div>
       </div>
 
@@ -245,12 +301,12 @@ const PropertyDetailsModal = ({ isOpen, properties, isUserData, isMobile, onClos
 
           <div
             className={`grid gap-3 ${isMobile
-                ? "grid-cols-1"
-                : sortedOffers.length <= 2
-                  ? "grid-cols-1 md:grid-cols-2"
-                  : sortedOffers.length === 3
-                    ? "grid-cols-1 lg:grid-cols-3 md:grid-cols-2"
-                    : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+              ? "grid-cols-1"
+              : sortedOffers.length <= 2
+                ? "grid-cols-1 md:grid-cols-2"
+                : sortedOffers.length === 3
+                  ? "grid-cols-1 lg:grid-cols-3 md:grid-cols-2"
+                  : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
               }`}
           >
             {sortedOffers.map((offer, index) => (

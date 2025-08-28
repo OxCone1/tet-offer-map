@@ -292,7 +292,7 @@ const AppContent = () => {
   onDeleteDataset={handleDeleteDataset}
       />
 
-      <div className={`h-full transition-all duration-300 ${!isMobile ? "ml-0" : ""}`}>
+      <div className={`h-dvh transition-all duration-300 ${!isMobile ? "ml-0" : ""}`}>
         <MapContainer onMapReady={handleMapReady} />
       </div>
 
