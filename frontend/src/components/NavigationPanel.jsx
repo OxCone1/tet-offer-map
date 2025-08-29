@@ -75,7 +75,7 @@ function NavigationContent({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white min-h-0 ">
+            <div className="flex-1 overflow-y-auto bg-white min-h-0 no-scrollbar">
                 {activeTab === "search" && (
                     <div className="p-4">
                         <div className="mb-4">

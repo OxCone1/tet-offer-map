@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useMap, useSearch, useStorage, useData, useMobile, useNotifications } from "./hooks.jsx"
 import { DataUtils } from "./utils.js"
 import NavigationPanel from "./components/NavigationPanel.jsx"
@@ -32,17 +32,16 @@ const AppContent = () => {
   const isMobile = useMobile()
   const { showNotification } = useNotifications()
   const storage = useStorage()
-  const { tetData, userData, userDataEntries, allData, loading, addUserData, deleteUserDataset } = useData(storage)
+  const { tetData, combinedPointers, loadedRegionNames, loadedUserDatasetNames, userData, userDataEntries, allData, loading, addUserData, deleteUserDataset, handleViewportChange } = useData(storage)
   // Per user dataset visibility map (id -> bool)
   const [datasetVisibility, setDatasetVisibility] = useState({});
 
   // Compute visible user features based on per-dataset visibility (default true)
-  const visibleUserData = (userDataEntries && userDataEntries.length > 0)
-    ? userDataEntries.reduce((acc, ds) => {
-        if (datasetVisibility[ds.id] !== false) acc.push(...(ds.data || []));
-        return acc;
-      }, [])
-    : userData;
+  const visibleUserData = userData.filter(f => {
+    const dsId = f.properties?.dataset_id; // added during lazy load
+    if (!dsId) return true; // legacy already-loaded features
+    return datasetVisibility[dsId] !== false;
+  });
 
   // Initialize any newly loaded datasets visibility to true
   useEffect(() => {
@@ -87,13 +86,40 @@ const AppContent = () => {
     initializeMap(containerElement)
   }
 
+  // Hook map move/zoom to dynamic region loading once mapManager is ready
+  const viewportDebounceRef = useRef(null);
+  useEffect(() => {
+    if (!mapManager) return;
+    const rawHandler = () => {
+      const boundsInfo = mapManager.getVisibleBounds && mapManager.getVisibleBounds();
+      if (!boundsInfo) return;
+      if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
+      viewportDebounceRef.current = setTimeout(() => handleViewportChange(boundsInfo), 180); // 180ms debounce
+    };
+    mapManager.map.on('moveend', rawHandler);
+    mapManager.map.on('zoomend', rawHandler);
+    // initial trigger
+    rawHandler();
+    return () => {
+      mapManager.map.off('moveend', rawHandler);
+      mapManager.map.off('zoomend', rawHandler);
+      if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
+    };
+  }, [mapManager, handleViewportChange]);
+
   // Update map data when data or visibility toggles change
   useEffect(() => {
     if (!mapManager) return
 
+    // Always render region outlines (lightweight) from pointers
+    if (combinedPointers && combinedPointers.length) {
+      const mergedLoaded = new Set([...loadedRegionNames, ...loadedUserDatasetNames]);
+      mapManager.setRegionOutlines(combinedPointers, mergedLoaded);
+    }
+
     // Update cached data first
-  if (tetData.length > 0) mapManager.tetDataCache = tetData
-  mapManager.userDataCache = visibleUserData
+    if (tetData.length > 0) mapManager.tetDataCache = tetData
+    mapManager.userDataCache = visibleUserData
 
     // Use toggle methods to respect visibility
     mapManager.toggleTETData(showTetData)
@@ -115,14 +141,14 @@ const AppContent = () => {
     mapManager.toggleSectors(showSectors)
     mapManager.updateSectors({
       tet: tetData,
-    user: visibleUserData,
+      user: visibleUserData,
       includeTet: showTetData,
       includeUser: showUserData,
       epsMeters: sectorsRadius,
       minPts: sectorsMinPts,
     })
     mapManager.setTypeFilters(typeFilters)
-  }, [mapManager, tetData, visibleUserData, showTetData, showUserData, showSectors, sectorsRadius, sectorsMinPts, typeFilters, userDataEntries, datasetVisibility])
+  }, [mapManager, tetData, visibleUserData, showTetData, showUserData, showSectors, sectorsRadius, sectorsMinPts, typeFilters, userDataEntries, datasetVisibility, combinedPointers, loadedRegionNames, loadedUserDatasetNames])
 
   // Handle search result selection
   const handleSearchResultSelect = (result) => {
@@ -174,14 +200,14 @@ const AppContent = () => {
         }
       }
 
-  const { id, features } = await addUserData(data, file.name, datasetName)
+      const { id, features } = await addUserData(data, file.name, datasetName)
 
       // Enable user data layer
       setShowUserData(true)
 
-  // Ensure visibility on new dataset
-  setDatasetVisibility(prev => ({ ...prev, [id]: true }))
-  showNotification(translate('message.file.success', { count: features.length, filename: datasetName || file.name }), "success")
+      // Ensure visibility on new dataset
+      setDatasetVisibility(prev => ({ ...prev, [id]: true }))
+      showNotification(translate('message.file.success', { count: features.length, filename: datasetName || file.name }), "success")
     } catch (error) {
       console.error("Error processing file:", error)
       showNotification(translate('message.file.error'), "error")
@@ -272,7 +298,7 @@ const AppContent = () => {
         // Controls props
         showTetData={showTetData}
         showUserData={showUserData}
-  userDataCount={visibleUserData.length}
+        userDataCount={visibleUserData.length}
         onToggleTetData={setShowTetData}
         onToggleUserData={setShowUserData}
         onFileUpload={handleFileUpload}
@@ -284,12 +310,12 @@ const AppContent = () => {
         onChangeSectorsMinPts={setSectorsMinPts}
         typeFilters={typeFilters}
         onChangeTypeFilters={setTypeFilters}
-  tetData={tetData}
-  userData={visibleUserData}
-  userDatasets={userDataEntries?.map(e => ({ id: e.id, name: e.name || e.filename, count: e.data?.length || 0 })) || []}
-  datasetVisibility={datasetVisibility}
-  onToggleDataset={(id, value) => setDatasetVisibility(prev => ({ ...prev, [id]: value }))}
-  onDeleteDataset={handleDeleteDataset}
+        tetData={tetData}
+        userData={visibleUserData}
+        userDatasets={userDataEntries?.map(e => ({ id: e.id, name: e.name || e.filename, count: e.data?.length || 0 })) || []}
+        datasetVisibility={datasetVisibility}
+        onToggleDataset={(id, value) => setDatasetVisibility(prev => ({ ...prev, [id]: value }))}
+        onDeleteDataset={handleDeleteDataset}
       />
 
       <div className={`h-dvh transition-all duration-300 ${!isMobile ? "ml-0" : ""}`}>
@@ -303,7 +329,7 @@ const AppContent = () => {
         isMobile={isMobile}
         isControlPanelOpen={isControlPanelOpen}
         tetData={tetData}
-  userData={visibleUserData}
+        userData={visibleUserData}
         showTetData={showTetData}
         showUserData={showUserData}
         mapManager={mapManager}

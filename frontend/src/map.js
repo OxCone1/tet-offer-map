@@ -10,11 +10,37 @@ export class MapManager {
     this.map = null;
     this.tetLayer = null;
     this.userLayer = null;
+    this.regionsOutlineLayer = null;
     this.sectorsLayer = null;
     this.sectorsVisible = false;
     this.typeFilters = new Set(); // empty => show all
     this._autoLogBounds = false; // disabled by default; can be toggled for prototyping
+    this._outlineThresholdZoom = 15; // hide outlines at/above this zoom
+    this._outlinesCurrentlyVisible = true;
     this.init();
+  }
+
+  /** Deterministic pastel-ish color for a region name */
+  _colorForRegion(name) {
+    if (!name) return '#64748b';
+    // simple hash to 0-360
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+      h = (h * 31 + name.charCodeAt(i)) % 360;
+    }
+    // Use HSL then convert to hex for consistency with other styles
+    const s = 55; // saturation
+    const l = 58; // lightness
+    // convert h,s,l to rgb/hex
+    const toHex = (v) => v.toString(16).padStart(2, '0');
+    const a = s * Math.min(l, 100 - l) / 100;
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color / 100);
+    };
+    const r = f(0), g = f(8), b = f(4);
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 
   /**
@@ -51,6 +77,7 @@ export class MapManager {
     // Initialize layer groups
     this.tetLayer = L.layerGroup().addTo(this.map);
     this.userLayer = L.layerGroup().addTo(this.map);
+    this.regionsOutlineLayer = L.layerGroup().addTo(this.map);
     this.sectorsLayer = L.layerGroup().addTo(this.map);
 
     // Fix for Leaflet default markers
@@ -58,11 +85,12 @@ export class MapManager {
 
     // Re-style on zoom changes and log current zoom for testing
     this.map.on('zoomend', () => {
-      const z = this.map.getZoom ? this.map.getZoom() : null;
-      console.log('Map zoom changed:', z);
+      // const z = this.map.getZoom ? this.map.getZoom() : null;
+      // console.log('Map zoom changed:', z);
       this._restyleVisibleLayers();
       if (this._autoLogBounds) this.logVisibleBounds('zoomend');
       this._persistView();
+      this._updateOutlineVisibility();
     });
 
     // Log bounds after finished moving (panning or programmatic setView/fitBounds)
@@ -522,11 +550,13 @@ export class MapManager {
           const opts = this._styleForGeometry({ type: 'Point' }, layer.options.color);
           layer.setStyle(opts.point);
         } else if (layer instanceof L.GeoJSON) {
-          layer.setStyle((feat) => {
-            const color = (layer.options && layer.options.style && layer.options.style.color) || '#888';
-            const s = this._styleForGeometry(feat.geometry, color).polygon;
-            return s;
-          });
+          if (!layer.options || !layer.options.outlineRegion) {
+            layer.setStyle((feat) => {
+              const color = (layer.options && layer.options.style && layer.options.style.color) || '#888';
+              const s = this._styleForGeometry(feat.geometry, color).polygon;
+              return s;
+            });
+          }
         } else if (layer.setStyle && layer.getLatLng) {
           // generic vector
           const opts = this._styleForGeometry({ type: 'Point' }, layer.options.color);
@@ -536,6 +566,67 @@ export class MapManager {
     };
     applyToLayerGroup(this.tetLayer);
     applyToLayerGroup(this.userLayer);
+  }
+
+  /** Render region outlines (pointer entries). Each entry expected: { name, outline }. loadedSet optional Set of loaded region names */
+  setRegionOutlines(pointerEntries, loadedSet) {
+    if (!this.regionsOutlineLayer) return;
+    if (!Array.isArray(pointerEntries)) return;
+    // Always rebuild so loaded/unloaded style changes apply immediately
+    this.regionsOutlineLayer.clearLayers();
+    pointerEntries.forEach(entry => {
+      if (!entry || !entry.outline || entry.outline.type !== 'Polygon') return;
+      try {
+        const feature = { type: 'Feature', geometry: entry.outline, properties: { name: entry.name, count: entry.count } };
+        const baseColor = this._colorForRegion(entry.name);
+        const isLoaded = loadedSet && loadedSet.has(entry.name);
+        const stroke = baseColor;
+        const fillColor = baseColor;
+        const gj = L.geoJSON(feature, {
+          style: () => ({
+            color: stroke,
+            weight: isLoaded ? 2 : 1.2,
+            opacity: 0.95,
+            fillColor,
+            fillOpacity: isLoaded ? 0.55 : 0.25, // majority opacity when loaded, softer when not
+            dashArray: isLoaded ? null : '4 4'
+          }),
+          outlineRegion: true,
+          onEachFeature: (feat, layer) => {
+            layer.bindTooltip(`${entry.name.replace('.ndjson', '')} (${entry.count ?? '?'})`, { sticky: true });
+            layer.on('click', () => {
+              const b = layer.getBounds();
+              if (!b.isValid()) return;
+              const center = b.getCenter();
+              const targetZoom = this._outlineThresholdZoom; // 15
+              this.map.setView(center, targetZoom, { animate: true });
+              setTimeout(() => {
+                if (this.map.getZoom() !== targetZoom) {
+                  this.map.setView(center, targetZoom, { animate: false });
+                }
+              }, 250);
+            });
+          }
+        });
+        gj.addTo(this.regionsOutlineLayer);
+      } catch (e) {
+        console.warn('Failed to add outline for', entry.name, e);
+      }
+    });
+    this._updateOutlineVisibility();
+  }
+
+  _updateOutlineVisibility() {
+    if (!this.map || !this.regionsOutlineLayer) return;
+    const z = this.map.getZoom();
+    const shouldShow = z < this._outlineThresholdZoom;
+    if (shouldShow && !this._outlinesCurrentlyVisible) {
+      this.regionsOutlineLayer.addTo(this.map);
+      this._outlinesCurrentlyVisible = true;
+    } else if (!shouldShow && this._outlinesCurrentlyVisible) {
+      this.map.removeLayer(this.regionsOutlineLayer);
+      this._outlinesCurrentlyVisible = false;
+    }
   }
 
   _passesFilter(normType) {
@@ -690,7 +781,7 @@ export class MapManager {
       const z = this.map.getZoom();
       const payload = { lat: c.lat, lng: c.lng, zoom: z, ts: Date.now() };
       localStorage.setItem('mapViewState', JSON.stringify(payload));
-  } catch {
+    } catch {
       // Swallow errors (e.g., private mode)
     }
   }
@@ -702,7 +793,7 @@ export class MapManager {
       const parsed = JSON.parse(raw);
       if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') return parsed;
       return null;
-  } catch {
+    } catch {
       return null;
     }
   }
