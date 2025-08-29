@@ -304,6 +304,42 @@ async function processFeatureInContext(feat, index, total, ctx) {
         await persistGeoJSON(ctx.filePath, ctx.geojson);
         return null;
     }
+    // Duplicate detection within destination export file
+    const outPath = path.join(EXPORTS_DIR, exportFileName);
+    // Lazy load existing IDs for this export file once
+    if (!ctx.exportIdSets.has(exportFileName)) {
+        const idSet = new Set();
+        if (fs.existsSync(outPath)) {
+            // Stream read to avoid loading huge file fully into memory
+            const rl = require('readline').createInterface({
+                input: fs.createReadStream(outPath, { encoding: 'utf8' }),
+                crlfDelay: Infinity
+            });
+            await new Promise(res => {
+                rl.on('line', line => {
+                    const t = line.trim();
+                    if (!t) return;
+                    try { const obj = JSON.parse(t); if (obj && obj.id) idSet.add(obj.id); } catch { }
+                });
+                rl.on('close', res);
+                rl.on('error', () => res());
+            });
+        }
+        ctx.exportIdSets.set(exportFileName, idSet);
+    }
+    const exportIdSet = ctx.exportIdSets.get(exportFileName);
+    if (exportIdSet.has(id)) {
+        // Already present in destination file -> treat as successful skip
+        await ctx.withLock(async () => {
+            if (!ctx.progressSet.has(id)) {
+                ctx.progressSet.add(id);
+                ctx.geojson.progress.push(id);
+                await persistGeoJSON(ctx.filePath, ctx.geojson);
+            }
+        });
+        console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${id} already exists in ${exportFileName} -> skipped`);
+        return null;
+    }
     const address = buildAddressString(props);
     console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${address}`);
     try {
@@ -319,13 +355,14 @@ async function processFeatureInContext(feat, index, total, ctx) {
             scrapedAt: new Date().toISOString(),
             source: 'api',
         };
-        const outPath = path.join(EXPORTS_DIR, exportFileName);
         await appendLine(outPath, record);
+        exportIdSet.add(id);
         // Serialize write to prevent race when batching
         await ctx.withLock(async () => {
             ctx.progressSet.add(id);
             ctx.geojson.progress.push(id);
             await persistGeoJSON(ctx.filePath, ctx.geojson);
+            ctx.changedExports.add(exportFileName);
         });
         console.log(`  ✓ ${id} (${internetOffers.length} offers) -> ${exportFileName}`);
         return record;
@@ -370,6 +407,7 @@ async function reprocessFeature(feat, ctx) {
                 ctx.geojson.errors = ctx.geojson.errors.filter(eid => eid !== id);
             }
             await persistGeoJSON(ctx.filePath, ctx.geojson);
+            ctx.changedExports.add(exportFileName);
         });
         console.log(`  ↺ Recovery success ${id} (${internetOffers.length} offers)`);
         return record;
@@ -422,6 +460,7 @@ async function run() {
     console.log(`Using batch size: ${batchSize}`);
 
     let anyErrorsRemaining = false;
+    const changedExportsGlobal = new Set();
 
     for (const filePath of files) {
         console.log(`\n=== Processing source ${path.basename(filePath)} ===`);
@@ -431,6 +470,8 @@ async function run() {
             geojson,
             progressSet: new Set(geojson.progress),
             errorSet: new Set(geojson.errors),
+            exportIdSets: new Map(),
+            changedExports: new Set(),
             // simple promise-based mutex
             _lock: Promise.resolve(),
             withLock(fn){ this._lock = this._lock.then(fn, fn); return this._lock; }
@@ -473,15 +514,28 @@ async function run() {
         await recoveryPass(ctx, features, batchSize);
         if (ctx.geojson.errors.length) anyErrorsRemaining = true;
         console.log(`Completed ${path.basename(filePath)}. Progress stored inside file.`);
+
+        // Merge changed exports and update pointer incrementally
+        for (const n of ctx.changedExports) changedExportsGlobal.add(n);
+        if (ctx.changedExports.size) {
+            try {
+                await updatePointerIndexIncremental(changedExportsGlobal);
+                // After writing, clear global set so further additions only include new ones
+                changedExportsGlobal.clear();
+            } catch(e) {
+                console.warn('Failed incremental pointer update:', e.message);
+            }
+        }
     }
     console.log('\nAll import files processed. Outputs located in ./exports');
 
+    // Final full rebuild to ensure outlines reflect all data if no errors
     if (!anyErrorsRemaining) {
-        console.log('No errors remain. Building pointer.json index…');
-        await buildPointerIndex();
-        console.log('pointer.json written.');
-    } else {
-        console.log('Errors remain; skipping pointer.json generation.');
+        try {
+            console.log('No errors remain. Rebuilding full pointer.json index…');
+            await buildPointerIndex();
+            console.log('pointer.json written.');
+        } catch(e){ console.warn('Final pointer rebuild failed:', e.message); }
     }
 }
 
@@ -508,6 +562,29 @@ async function buildPointerIndex() {
     }
     index.sort((a,b)=>a.name.localeCompare(b.name));
     await fsp.writeFile(pointerPath, JSON.stringify(index, null, 2), 'utf8');
+}
+
+async function updatePointerIndexIncremental(changedSet) {
+    if (!changedSet || !changedSet.size) return;
+    const pointerPath = path.join(EXPORTS_DIR, 'pointer.json');
+    let existing = [];
+    try {
+        if (fs.existsSync(pointerPath)) {
+            const txt = await fsp.readFile(pointerPath, 'utf8');
+            existing = JSON.parse(txt);
+            if (!Array.isArray(existing)) existing = [];
+        }
+    } catch { existing = []; }
+    // Map by name
+    const map = new Map(existing.map(e => [e.name, e]));
+    for (const name of changedSet) {
+        const full = path.join(EXPORTS_DIR, name);
+        if (!fs.existsSync(full)) continue;
+        const stats = await computeFileStats(full, name);
+        if (stats) map.set(name, stats);
+    }
+    const outArr = Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name));
+    await fsp.writeFile(pointerPath, JSON.stringify(outArr, null, 2));
 }
 
 function collectCoords(geometry, collector) {
@@ -540,6 +617,8 @@ async function computeFileStats(fullPath, name) {
     return new Promise((resolve, reject) => {
         let count = 0;
         let north = null, south = null, east = null, west = null; // store {coord:[lon,lat], lat, lon}
+        const POINT_LIMIT = 20000; // safety cap
+        const allPoints = [];
         const lineReader = require('readline').createInterface({
             input: fs.createReadStream(fullPath, { encoding: 'utf8' }),
             crlfDelay: Infinity
@@ -559,6 +638,12 @@ async function computeFileStats(fullPath, name) {
                     if (!south || lat < south.lat) south = { coord: [lon, lat], lat, lon };
                     if (!east  || lon > east.lon)  east  = { coord: [lon, lat], lat, lon };
                     if (!west  || lon < west.lon)  west  = { coord: [lon, lat], lat, lon };
+                    if (allPoints.length < POINT_LIMIT) {
+                        allPoints.push([lon, lat]);
+                    } else if (Math.random() < 0.0005) { // very light reservoir style sample
+                        const idx = Math.floor(Math.random() * POINT_LIMIT);
+                        allPoints[idx] = [lon, lat];
+                    }
                 });
             } catch { /* ignore malformed */ }
         });
@@ -569,8 +654,31 @@ async function computeFileStats(fullPath, name) {
             if (south) pointsArr.push({ direction: 'south', coord: south.coord });
             if (east)  pointsArr.push({ direction: 'east',  coord: east.coord });
             if (west)  pointsArr.push({ direction: 'west',  coord: west.coord });
-            resolve({ name, path: name, count, furthestPoints: pointsArr });
+            const outline = buildOutlinePolygon(allPoints);
+            resolve({ name, path: name, count, furthestPoints: pointsArr, outline });
         });
         lineReader.on('error', reject);
     });
+}
+
+function buildOutlinePolygon(points) {
+    if (!points || points.length < 3) return null;
+    // Deduplicate
+    const keySet = new Set();
+    const uniq = [];
+    for (const p of points) {
+        const k = p[0].toFixed(6)+','+p[1].toFixed(6);
+        if (!keySet.has(k)) { keySet.add(k); uniq.push(p); }
+    }
+    if (uniq.length < 3) return null;
+    // Monotonic chain convex hull (lon = x, lat = y)
+    uniq.sort((a,b)=> a[0]===b[0] ? a[1]-b[1] : a[0]-b[0]);
+    const cross = (o,a,b)=> (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lower=[]; for (const p of uniq){ while(lower.length>=2 && cross(lower[lower.length-2], lower[lower.length-1], p)<=0) lower.pop(); lower.push(p);} 
+    const upper=[]; for (let i=uniq.length-1;i>=0;i--){ const p=uniq[i]; while(upper.length>=2 && cross(upper[upper.length-2], upper[upper.length-1], p)<=0) upper.pop(); upper.push(p);} 
+    const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+    if (hull.length < 3) return null;
+    // Close ring
+    const ring = hull.concat([hull[0]]);
+    return { type: 'Polygon', coordinates: [ ring ] };
 }
