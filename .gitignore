@@ -1,8 +1,5 @@
 **/node_modules
 **/dist
 **/package-lock.json
-data-extractor/tet_offers.ndjson
-data-extractor/tet_errors.ndjson
-data-extractor/progress.json
-data-extractor/export.geojson
-data-extractor/export.geojson.old
+data-extractor/**/*.ndjson
+data-extractor/**/*.geojson
