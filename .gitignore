@@ -1,7 +1,7 @@
 **/node_modules
 **/dist
 **/package-lock.json
-data-extractor/**/*.ndjson
-data-extractor/**/*.geojson
-data-extractor/exports/pointer.json
 
+data-extractor/**/*.ndjson
+data-extractor/imports/*.geojson
+data-extractor/exports/pointer.json

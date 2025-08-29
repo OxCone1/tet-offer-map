@@ -30,6 +30,7 @@ const { createHash } = require('crypto');
 
 const IMPORTS_DIR = path.resolve(__dirname, 'imports');
 const EXPORTS_DIR = path.resolve(__dirname, 'exports');
+const RIGA_NEIGHBORHOODS_GEOJSON = path.resolve(__dirname, 'riga_neighborhoods.geojson');
 
 const DEFAULT_BATCH = 5; // default concurrent requests (safe with write lock)
 
@@ -120,7 +121,212 @@ function slugify(str) {
         || 'unknown';
 }
 
-function buildExportFileName(props) {
+let rigaNeighborhoods = null; // lazily loaded FeatureCollection
+
+function neighborhoodProp(f) {
+    if (!f || !f.properties) return null;
+    return f.properties.neighborhood || f.properties.Name || f.properties.name || f.properties.NAME || null;
+}
+
+async function loadRigaNeighborhoods() {
+    if (rigaNeighborhoods !== null) return rigaNeighborhoods;
+    try {
+        const txt = await fsp.readFile(RIGA_NEIGHBORHOODS_GEOJSON, 'utf8');
+        const data = JSON.parse(txt);
+        if (data && data.type === 'FeatureCollection' && Array.isArray(data.features)) {
+            rigaNeighborhoods = data.features.filter(f => f && f.geometry && f.properties);
+            // Pre-compute bounding boxes for faster rejection
+            const computeBBox = (geom) => {
+                let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+                collectCoords(geom, (c) => {
+                    const lon = c[0];
+                    const lat = c[1];
+                    if (typeof lon !== 'number' || typeof lat !== 'number') return;
+                    if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+                    if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+                });
+                if (minLon === Infinity) return null;
+                return { minLon, minLat, maxLon, maxLat };
+            };
+            for (const f of rigaNeighborhoods) {
+                try { f.__bbox = computeBBox(f.geometry); } catch { f.__bbox = null; }
+            }
+        } else {
+            rigaNeighborhoods = [];
+        }
+    } catch {
+        rigaNeighborhoods = [];
+    }
+    return rigaNeighborhoods;
+}
+
+function getPointFromGeometry(geometry) {
+    if (!geometry) return null;
+    const t = geometry.type;
+    const c = geometry.coordinates;
+    if (!t) return null;
+    switch (t) {
+        case 'Point':
+            if (Array.isArray(c) && c.length >= 2) return c;
+            return null;
+        case 'MultiPoint':
+            if (Array.isArray(c) && c.length) return c[0];
+            return null;
+        case 'LineString':
+            if (Array.isArray(c) && c.length) return c[Math.floor(c.length/2)];
+            return null;
+        case 'MultiLineString':
+            if (Array.isArray(c) && c.length && Array.isArray(c[0]) && c[0].length) return c[0][Math.floor(c[0].length/2)];
+            return null;
+        case 'Polygon':
+            // simple centroid of outer ring
+            if (Array.isArray(c) && c.length && Array.isArray(c[0])) return ringCentroid(c[0]);
+            return null;
+        case 'MultiPolygon':
+            if (Array.isArray(c) && c.length && Array.isArray(c[0]) && c[0].length) return ringCentroid(c[0][0]);
+            return null;
+        default:
+            return null;
+    }
+}
+
+function ringCentroid(ring) {
+    if (!Array.isArray(ring) || ring.length === 0) return null;
+    let area = 0, cx = 0, cy = 0;
+    for (let i=0;i<ring.length-1;i++) {
+        const [x1,y1] = ring[i];
+        const [x2,y2] = ring[i+1];
+        const a = x1*y2 - x2*y1;
+        area += a;
+        cx += (x1 + x2) * a;
+        cy += (y1 + y2) * a;
+    }
+    if (area === 0) return ring[0];
+    area *= 0.5;
+    return [cx/(6*area), cy/(6*area)];
+}
+
+function pointInPolygon(point, polygonCoords) {
+    // Ray casting; polygonCoords is array of [lon,lat]
+    let inside = false;
+    for (let i=0,j=polygonCoords.length-1;i<polygonCoords.length;j=i++) {
+        const xi = polygonCoords[i][0], yi = polygonCoords[i][1];
+        const xj = polygonCoords[j][0], yj = polygonCoords[j][1];
+        const intersect = ((yi>point[1]) !== (yj>point[1])) && (point[0] < (xj - xi) * (point[1]-yi) / (yj-yi + 1e-15) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function pointInPolygonEitherOrder(point, polygonCoords) {
+    // Try normal order lon,lat first
+    if (pointInPolygon(point, polygonCoords)) return true;
+    // If coords look like [lat,lon] (first between 55-58 and second 23-26 typical for Latvia) then treat swapped
+    const looksLatLon = polygonCoords && polygonCoords.length >= 3 && polygonCoords.slice(0,5).some(c => c && Math.abs(c[0]) > 50 && Math.abs(c[1]) < 50);
+    if (looksLatLon) {
+        const swappedRing = polygonCoords.map(c => [c[1], c[0]]);
+        if (pointInPolygon(point, swappedRing)) return true;
+    }
+    // Try swapping point (if user geometry point maybe lat,lon)
+    const swappedPoint = [point[1], point[0]];
+    if (pointInPolygon(swappedPoint, polygonCoords)) return true;
+    if (looksLatLon) {
+        const swappedRing = polygonCoords.map(c => [c[1], c[0]]);
+        if (pointInPolygon(swappedPoint, swappedRing)) return true;
+    }
+    return false;
+}
+
+function pointInFeature(point, feature) {
+    if (!feature || !feature.geometry) return false;
+    const g = feature.geometry;
+    if (g.type === 'Polygon') {
+        if (!Array.isArray(g.coordinates) || !g.coordinates.length) return false;
+        if (!pointInPolygonEitherOrder(point, g.coordinates[0])) return false;
+        // holes: if inside any hole -> exclude
+        for (let i=1;i<g.coordinates.length;i++) {
+            if (pointInPolygonEitherOrder(point, g.coordinates[i])) return false;
+        }
+        return true;
+    }
+    if (g.type === 'MultiPolygon') {
+        for (const poly of g.coordinates) {
+            if (!Array.isArray(poly) || !poly.length) continue;
+            if (pointInPolygonEitherOrder(point, poly[0])) {
+                let inHole = false;
+                for (let i=1;i<poly.length;i++) if (pointInPolygonEitherOrder(point, poly[i])) { inHole = true; break; }
+                if (!inHole) return true;
+            }
+        }
+        return false;
+    }
+    return false;
+}
+
+function selectRigaNeighborhood(point) {
+    if (!point || !rigaNeighborhoods || !rigaNeighborhoods.length) return null;
+    const matches = [];
+    const [plon, plat] = point;
+    for (const f of rigaNeighborhoods) {
+        try {
+            if (f.__bbox) {
+                const b = f.__bbox;
+                if (plon < b.minLon || plon > b.maxLon || plat < b.minLat || plat > b.maxLat) continue;
+            }
+            if (pointInFeature(point, f)) {
+                let area = 0;
+                const g = f.geometry;
+                const addRingArea = (ring) => { let a=0; for (let i=0;i<ring.length-1;i++){ const [x1,y1]=ring[i]; const [x2,y2]=ring[i+1]; a += x1*y2 - x2*y1; } return Math.abs(a/2); };
+                if (g.type === 'Polygon') area = addRingArea(g.coordinates[0]);
+                else if (g.type === 'MultiPolygon') area = g.coordinates.reduce((s,p)=> s + (Array.isArray(p)&&p.length? addRingArea(p[0]):0),0);
+                matches.push({ f, area });
+            }
+        } catch {}
+    }
+    if (!matches.length) return null;
+    matches.sort((a,b)=> a.area - b.area);
+    return neighborhoodProp(matches[0].f);
+}
+
+function flattenAllPoints(geometry, out) {
+    if (!geometry) return;
+    const t = geometry.type;
+    const c = geometry.coordinates;
+    switch (t) {
+        case 'Point':
+            if (Array.isArray(c) && c.length>=2) out.push(c);
+            break;
+        case 'MultiPoint':
+        case 'LineString':
+            if (Array.isArray(c)) c.forEach(p=> Array.isArray(p)&&p.length>=2 && out.push(p));
+            break;
+        case 'MultiLineString':
+        case 'Polygon':
+            if (Array.isArray(c)) c.forEach(r=> Array.isArray(r) && r.forEach(p=> Array.isArray(p)&&p.length>=2 && out.push(p)));
+            break;
+        case 'MultiPolygon':
+            if (Array.isArray(c)) c.forEach(pgon=> Array.isArray(pgon) && pgon.forEach(r=> Array.isArray(r)&&r.forEach(p=> Array.isArray(p)&&p.length>=2 && out.push(p))));
+            break;
+        case 'GeometryCollection':
+            if (Array.isArray(geometry.geometries)) geometry.geometries.forEach(g=>flattenAllPoints(g,out));
+            break;
+    }
+}
+
+function findRigaNeighborhoodForGeometry(geometry) {
+    if (!rigaNeighborhoods || !rigaNeighborhoods.length || !geometry) return null;
+    const pts = [];
+    flattenAllPoints(geometry, pts);
+    for (const pt of pts) {
+        const neigh = selectRigaNeighborhood(pt);
+        if (neigh) return neigh;
+    }
+    const centroid = getPointFromGeometry(geometry);
+    if (centroid) return selectRigaNeighborhood(centroid);
+    return null;
+}
+
+async function buildExportFileName(props, geometry) {
     const city = props['addr:city'];
     const sub = props['addr:subdistrict'];
     const country = props['addr:country'] || 'lv';
@@ -128,6 +334,12 @@ function buildExportFileName(props) {
         return `${slugify(city)}_${slugify(sub)}_${slugify(country)}.ndjson`;
     }
     if (city) {
+        // Special Riga neighborhood logic
+        if (!sub && !props['addr:district'] && slugify(city) === 'riga') {
+            await loadRigaNeighborhoods();
+            const neigh = findRigaNeighborhoodForGeometry(geometry);
+            if (neigh) return `${slugify(neigh)}_${slugify(city)}_${slugify(country)}.ndjson`;
+        }
         return `${slugify(city)}_${slugify(country)}.ndjson`;
     }
     return null; // disregard
@@ -292,7 +504,7 @@ async function processFeatureInContext(feat, index, total, ctx) {
     if (ctx.progressSet.has(id) || ctx.errorSet.has(id)) return null; // already processed (success or failed)
     const props = feat.properties || {};
     const addrProps = pickAddrProps(props);
-    const exportFileName = buildExportFileName(addrProps);
+    const exportFileName = await buildExportFileName(addrProps, feat.geometry);
     if (!exportFileName) {
         // Disregarded silently (no city criteria) – do not mark progress per user spec
         return null;
@@ -385,7 +597,7 @@ async function reprocessFeature(feat, ctx) {
     if (!id) return null;
     const props = feat.properties || {};
     const addrProps = pickAddrProps(props);
-    const exportFileName = buildExportFileName(addrProps);
+    const exportFileName = await buildExportFileName(addrProps, feat.geometry);
     if (!exportFileName) return null; // still disregard
     if (!addrProps['addr:street'] || !addrProps['addr:housenumber']) return null;
     const address = buildAddressString(props);
@@ -581,7 +793,11 @@ async function updatePointerIndexIncremental(changedSet) {
         const full = path.join(EXPORTS_DIR, name);
         if (!fs.existsSync(full)) continue;
         const stats = await computeFileStats(full, name);
-        if (stats) map.set(name, stats);
+        if (stats) {
+            // Merge to retain previous outline if new outline is null (unlikely) but always refresh timestamp
+            const prev = map.get(name) || {};
+            map.set(name, { ...prev, ...stats, updatedAt: new Date().toISOString() });
+        }
     }
     const outArr = Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name));
     await fsp.writeFile(pointerPath, JSON.stringify(outArr, null, 2));
@@ -648,14 +864,14 @@ async function computeFileStats(fullPath, name) {
             } catch { /* ignore malformed */ }
         });
         lineReader.on('close', () => {
-            if (count === 0) return resolve({ name, path: name, count: 0, furthestPoints: [] });
+            if (count === 0) return resolve({ name, path: name, count: 0, furthestPoints: [], updatedAt: new Date().toISOString() });
             const pointsArr = [];
             if (north) pointsArr.push({ direction: 'north', coord: north.coord });
             if (south) pointsArr.push({ direction: 'south', coord: south.coord });
             if (east)  pointsArr.push({ direction: 'east',  coord: east.coord });
             if (west)  pointsArr.push({ direction: 'west',  coord: west.coord });
             const outline = buildOutlinePolygon(allPoints);
-            resolve({ name, path: name, count, furthestPoints: pointsArr, outline });
+            resolve({ name, path: name, count, furthestPoints: pointsArr, outline, updatedAt: new Date().toISOString() });
         });
         lineReader.on('error', reject);
     });
