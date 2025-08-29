@@ -2,7 +2,7 @@
 
 Live Demo: https://oxcone.com/tet-map/
 
-Full workflow to extract Latvian Tet internet availability data and visualize it on an interactive web map with optional user‑provided connectivity layers.
+Multi‑stage pipeline & web UI to extract Latvian Tet internet availability data, normalize it against OpenStreetMap (OSM) address geometry, and visualize per‑area internet technologies on an interactive map. Supports user‑provided connectivity overlays and fine‑grained per‑neighborhood slicing (Riga included).
 
 ## Motivation
 I built this to give everyday users a clear, map‑based view of the real connectivity landscape around them: what kinds of internet technologies their neighbours already have, and where gaps still exist. Having that visibility helps people argue for upgrades, choose a better provider/technology, and generally raise local awareness about broadband availability (or the lack of it) in their area. The goal is empowerment through transparency – turning scattered, opaque availability checks into an explorable shared layer.
@@ -13,11 +13,12 @@ I built this to give everyday users a clear, map‑based view of the real connec
 | [`data-extractor/`](data-extractor/README.md) | Scrapers (API-first + Puppeteer fallback) enriching OSM addresses with Tet offers → NDJSON. |
 | [`frontend/`](frontend/README.md) | React + Vite application (Leaflet map, search, filters, sectors, uploads). |
 
-## High‑Level Flow
-1. Use Overpass Turbo to export OSM address + street features to `data-extractor/export.geojson`.
-2. Run the scraper → generates / updates `data-extractor/tet_offers.ndjson` (and errors/progress files).
-3. Copy the produced `tet_offers.ndjson` into `frontend/public/`.
-4. Build / run the frontend → map fetches `/tet_offers.ndjson` once at load.
+## High‑Level Flow (Deployed Usage)
+The production site fetches all authoritative datasets (pointer index + per‑area NDJSON partitions) directly from the external data repository:
+
+https://github.com/OxCone1/data-tet-map
+
+No local bundling of pointer / NDJSON files is required in the frontend build. End users can optionally add their own local connectivity information only via the in‑browser upload interface (user data layer). Local filesystem copies of exported NDJSON files are not used by the running app.
 
 ## 1. Prerequisites
 - Node.js >= 18 (frontend uses ES modules; scraper uses Puppeteer which benefits from modern Node).
@@ -41,33 +42,11 @@ out skel qt;
 
 Export → Download → GeoJSON → save as `data-extractor/export.geojson`.
 
-## 3. Run Scraper (API Preferred)
-```powershell
-cd data-extractor
-npm install          # first time
-npm run api          # fastest API mode → writes tet_offers.ndjson
-# (fallback if API rate-limited or changed)
-npm run puppeteer    # slower browser automation
-```
-Outputs:
-- `tet_offers.ndjson` – one JSON object per line (properties + offers + geometry)
-- `tet_errors.ndjson` – failed items
-- `progress.json` – processed IDs (for resume)
+## 3. Data Consumption in Frontend
+On load the frontend downloads the remote pointer index, then selectively fetches per‑area slices on demand. There is no need to place dataset files in `frontend/public/`.
 
-You can stop and restart; already processed IDs are skipped. To reprocess from scratch delete `progress.json` (and optionally the NDJSON files).
-
-## 4. Prepare Frontend
-Copy latest dataset:
-```powershell
-copy data-extractor\tet_offers.ndjson frontend\public\tet_offers.ndjson
-```
-Install & run:
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-Open http://localhost:5173 (default Vite port) or whatever is printed.
+## 4. Local Development Frontend
+For development you also rely on the remote dataset. Only user‑generated uploads (GeoJSON / NDJSON) are stored locally (IndexedDB) after using the upload UI. No manual copying of pointer or NDJSON export files is necessary.
 
 Build production bundle:
 ```powershell
@@ -81,12 +60,12 @@ Frontend build produces `frontend/dist/`. Serve it with any static server (Expre
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (_,res)=>res.sendFile(path.join(__dirname,'dist','index.html')));
 ```
-Ensure you copy `tet_offers.ndjson` into the deployed `dist/` (or keep it beside an upstream CDN path referenced at fetch time).
+The build does not bundle dataset lines; network fetch is performed at runtime.
 
-## 6. Technology Stack
+## 6. Technology Stack (Selected)
 | Area | Tech | Notes |
 |------|------|-------|
-| Scraper | Node.js, Axios (API) + Puppeteer (fallback), node-fetch, YAML | API first; browser only if needed. |
+| Scraper | Node.js, Axios (API) + Puppeteer (fallback) | API first; browser only if needed. |
 | Frontend Core | React 19, Vite, TypeScript (partial) | Fast dev + modern JSX runtime. |
 | Styling | Tailwind CSS 4, shadcn/ui patterns (Radix primitives + class-variance-authority + tailwind-merge + lucide-react icons) | Utility-first styling with composable accessible components. |
 | Map | Leaflet, custom clustering (DBSCAN + convex hull) | No heavyweight server; client clustering. |
@@ -96,7 +75,7 @@ Ensure you copy `tet_offers.ndjson` into the deployed `dist/` (or keep it beside
 | Server (deploy) | Express 5 (optional) | Static file + SPA fallback; not required for static hosts. |
 
 ## 7. Data Contracts
-Minimal Tet offer object (one line in NDJSON):
+Per-area NDJSON line shape:
 ```json
 {
   "id": "123456",
@@ -116,37 +95,43 @@ User uploaded Feature requirement:
 }
 ```
 
-## 8. Common Tasks
-| Goal | Commands |
-|------|----------|
-| Fresh scrape + run frontend | `npm --prefix data-extractor run api` → copy file → `npm --prefix frontend run dev` |
-| Recovery (failed only, API) | `npm --prefix data-extractor run api:validate` |
-| Clean & rescrape | Delete `data-extractor/progress.json` then rerun scraper |
-| Update dataset in running dev server | Re-copy NDJSON into `frontend/public/` and refresh browser |
+## 8. Common Tasks (Maintainers Only)
+| Goal | Notes |
+|------|-------|
+| Scrape & publish new dataset | Run extractor (private), push updated pointer + partitions to data repo. |
+| Retry failed IDs | Use extractor `--validate` or recovery script, republish. |
+| Adjust batch size | Configure extractor run; frontend unaffected. |
+| Add new geographic coverage | Add additional import GeoJSON(s), scrape, publish. |
 
-## 9. Troubleshooting
+## 9. Troubleshooting (Frontend)
 | Symptom | Fix |
 |---------|-----|
-| 404 `/tet_offers.ndjson` | File not copied into `frontend/public/` before build. |
-| Infinite fetch loop | Ensure only one fetch in `useData`; redeploy after cleanup. |
-| Blank map | Container needs height (see root div) / network blocked tiles. |
-| Modal empty | Input object missing `offers` or address properties. |
-| Scraper stalls | Site markup change → adjust selectors in `data-extractor/index.js`. |
-| Puppeteer Chrome download error | See "Puppeteer troubleshooting" in `data-extractor/README.md`. |
+| Dataset not loading | Check network access to data repo raw URLs (CORS / connectivity). |
+| Blank map | Ensure container height & tile network access. |
+| Modal empty | Underlying record has empty offers; verify upstream scrape. |
+| User upload not appearing | Confirm file is valid GeoJSON Feature(s) with required fields. |
 
 
 
 ## 10. Future Enhancements
+- Pointer‑driven lazy loading in frontend (if not yet merged)
 - Streaming parser for very large NDJSON (progressive rendering)
-- Configurable fetch endpoint (ENV var)
+- Configurable data endpoint / CDN base (ENV)
 - Geometry simplification pipeline
-- Offline bundle of tiles or vector layer switch
-- CI workflow to rebuild dataset on schedule
+- Scheduled CI scrape & publish to dataset repo
+- Optional concave hull for outlines
 
-## 11. License & Attribution
+## 11. Data Source Repository
+All datasets (pointer + per‑area NDJSON partitions) are fetched dynamically from:
+
+https://github.com/OxCone1/data-tet-map
+
+Local substitution is intentionally not supported; use the web UI upload for custom local layers.
+
+## 12. License & Attribution
 OpenStreetMap data © OpenStreetMap contributors. Tet brand/data belong to Tet. This project is for informational / analytical purposes.
 
 ---
-Pull requests welcome. Keep `tet_offers.ndjson` lean for faster load.
+Pull requests welcome. Keep per‑area files lean (drop unused props) for faster load and smaller pointer outlines.
 
 ❤️ Created by OxCone

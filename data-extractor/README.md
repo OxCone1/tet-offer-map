@@ -1,21 +1,32 @@
 # Data Extractor (Overpass → Tet Offer Scraper)
 
-Live Demo (frontend consuming this output): https://oxcone.com/tet-map/
+Live Demo (frontend visualising outputs): https://oxcone.com/tet-map/
 
-This folder contains a headless scraper that takes OpenStreetMap (OSM) address features from an exported GeoJSON (`export.geojson`) and queries Tet availability (https://www.tet.lv/pieejamiba). It enriches each feature with offer data and writes incremental NDJSON output so you can resume if it crashes.
+This folder hosts the API‑first Tet availability scraper and legacy Puppeteer fallback. The architecture now supports MULTIPLE import GeoJSONs and produces PARTITIONED per‑area NDJSON exports with a discoverable `pointer.json` index.
 
 ## Current State
-Stable for batch runs, but tightly coupled to Tet's current frontend (shadow DOM selectors in `index.js`). If Tet changes markup, selectors will need updates. Data collection is resilient: successful results stream to `tet_offers.ndjson`; failures stream to `tet_errors.ndjson`; processed IDs stored in `progress.json` allow restarts without re-fetching everything.
+API mode (`api.js`) is primary. Each raw import file placed in `imports/` is hashed (12 hex, shake256 6 bytes) → renamed to `_<hash>.geojson` and enriched in‑place with:
 
-## 1. Prepare Input Data with Overpass Turbo
-We use https://overpass-turbo.eu/ to export address + street network inside a bounding box you control.
+```jsonc
+{
+   "type": "FeatureCollection",
+   "features": [...],
+   "progress": ["way/123", "relation/456"],   // successful IDs
+   "errors": ["way/789"]                       // failed IDs (retryable)
+}
+```
+
+Offers are routed into per‑area NDJSON inside `exports/` (naming rules in section 4). A `pointer.json` file summarizes all exports (counts, extremes, outline polygon, updatedAt).
+
+## 1. Prepare Input Data (Overpass Turbo)
+Use https://overpass-turbo.eu/ to export address + street features. You can create MULTIPLE exports (adjacent bounding boxes) and drop them all into `imports/`.
 
 ### Steps
 1. Open https://overpass-turbo.eu/
 2. Pan/zoom to the exact area you want to scrape (keep it reasonably small to avoid rate limits; you can run multiple batches later). 
 3. Click the Wizard button (or directly paste a query) and replace everything with the query below.
 4. Press Run.
-5. When results load, click Export → Download → GeoJSON and save as `export.geojson` into this `data-extractor` folder (overwriting the existing placeholder if present).
+5. When results load, click Export → Download → GeoJSON and save into `data-extractor/imports/` (any filename). Repeat for other regions as needed.
 
 ### Recommended Query
 Copy/paste this EXACT query (it already includes timeout + JSON + address + highway coverage):
@@ -40,17 +51,18 @@ out skel qt;
 Use a rectangle in Overpass Turbo that tightly wraps the target settlement / district. Smaller areas reduce the risk of hitting Overpass rate limits and keep scraping time manageable. For large regions, split into multiple adjacent boxes and run sequentially—append outputs (the script will skip already processed IDs if `progress.json` is kept between runs).
 
 ## 2. Run the Scraper (API First, Puppeteer Fallback)
-Two implementations now exist:
+Two implementations:
 
-1. Fast API mode (`api.js`) – hits Tet's public JSON endpoints directly. MUCH faster & lighter.
-2. Legacy Puppeteer browser mode (`index.js`) – full page automation, only needed if the API gets rate‑limited or changes.
+1. API mode (`api.js`) – direct JSON endpoints (fast, low overhead).
+2. Legacy Puppeteer mode (`index.js`) – only if API changes or heavy throttling.
 
 Scripts (see `package.json`):
 
 | Command | What it does |
 |---------|---------------|
-| `npm run api` | Run fast API scraper (recommended default). |
-| `npm run api:validate` | Reprocess only previously failed addresses (error recovery) using API mode. |
+| `npm run api` | Process all imports → per-area exports + incremental pointer updates. |
+| `npm run api -- --update` | Rebuild `pointer.json` ONLY (no scraping). |
+| `npm run api:validate` | Retry only failed IDs across imports (API mode). |
 | `npm run puppeteer` | Run browser (slower) scraper. |
 | `npm run puppeteer:validate` | Recovery pass with Puppeteer for failed items. |
 
@@ -75,54 +87,55 @@ npm run api:validate
 npm run puppeteer:validate
 ```
 
-While running you will see progress. Stop any time (Ctrl+C) and restart; processed IDs are remembered across BOTH modes because they share `progress.json`.
+While running you will see per‑import progress. Stop any time (Ctrl+C) and restart; processed IDs are remembered per import file (`progress` array). Errors can later be retried with `api:validate`.
 
-## 3. Output Files (Shared Between API & Puppeteer)
-| File | Purpose |
-|------|---------|
-| `tet_offers.ndjson` | One JSON object per line: original minimal OSM props + geometry + fetched offers. |
-| `tet_errors.ndjson` | One line per failed item (with reason) so you can inspect / retry manually. |
-| `progress.json` | Array / map of processed feature IDs for resume logic. |
+## 3. Output Files
+| File / Pattern | Purpose |
+|----------------|---------|
+| `imports/_<hash>.geojson` | Source FeatureCollection with embedded `progress` + `errors`. |
+| `exports/city_subdistrict_country.ndjson` | Offers for that subdistrict. |
+| `exports/neighborhood_riga_lv.ndjson` | Riga neighborhood partition (auto‑classified). |
+| `exports/city_country.ndjson` | City‑level fallback (no subdistrict). |
+| `exports/pointer.json` | Index array: name, count, furthestPoints, outline polygon, updatedAt. |
 
-All are append-friendly; you can tail them while scraping.
+All NDJSON files contain one object per successful offer location; duplicates are avoided per file.
 
-## 4. Address Normalisation
-Address strings are composed from these tags when present: `addr:street`, `addr:housenumber`, `addr:city`, `addr:subdistrict`, `addr:district`. Latvian administrative suffixes are abbreviated (`pagasts` → `pag.`, `novads` → `nov.`) to better match Tet search behaviour.
+## 4. Export File Naming & Address Normalisation
+Rules:
+1. `addr:city` + `addr:subdistrict` → `city_subdistrict_country.ndjson`
+2. Riga special case: if city is Riga and neither subdistrict nor district set, attempt neighborhood polygon match (`riga_neighborhoods.geojson`) → `neighborhood_riga_lv.ndjson`
+3. Otherwise `city_country.ndjson`
+
+Normalisation: lowercase, strip diacritics, punctuation & spaces → `_`, trim leading/trailing underscores. Latvian suffix abbreviation: `pagasts`→`pag.`, `novads`→`nov.` for better API search matching.
 
 ## 5. Restart / Resume
-If the script crashes, fix the cause (selectors, network, etc.) and run `npm start` again. Already processed IDs (those in `progress.json`) will be skipped. To force a full re-run, delete `progress.json` and (optionally) the output NDJSON files first.
+Per import file resume: progress is stored inline. To reprocess an import from scratch remove its `_hash.geojson` (or delete `progress` / `errors` arrays inside) then rerun.
 
-## 6. Common Issues (API vs Browser)
+## 6. Common Issues
 | Issue | Hint |
 |-------|------|
-| Empty results | Inspect address formatting; verify the feature actually exists on Tet's site. |
-| Many rapid failures (API) | Temporary throttling – reduce batch (`--batch=2`) or switch to Puppeteer fallback. |
-| Many rapid failures (Puppeteer) | Tet layout / shadow DOM change: update selectors in `index.js`. |
-| Overpass export too large | Split the area into smaller bounding boxes and merge NDJSON outputs later. |
-| Memory usage grows | Run in smaller batches; archive older NDJSON lines. |
-| Puppeteer Chrome not found / download error | See "Puppeteer troubleshooting" below. |
+| Empty results | Check normalized address string; compare in Tet site manually. |
+| API 429 / timeouts | Lower batch (`--batch=3`) or pause; fallback to Puppeteer. |
+| All Riga points go to `riga_lv` | Ensure `riga_neighborhoods.geojson` exists & contains polygons. |
+| Large import slow | Split imports—parallel hashing okay; scraping still respects concurrency cap. |
+| Pointer missing file | Ensure at least one offer with non-empty `offers` array was written for that area. |
+| Puppeteer Chrome errors | See troubleshooting section below. |
 
 ## 7. Consuming the Output
-The frontend expects `tet_offers.ndjson` at build/deploy time. After scraping, copy or symlink this file into the frontend's `public` (or wherever it's being served) before building the production bundle.
+Preferred: frontend reads `exports/pointer.json` then lazily fetches selected per‑area NDJSON files. Legacy: concatenate exports into one large file if pointer flow not yet integrated.
 
-## 8. Updating Selectors (If Tet Changes)
+## 8. Updating Selectors (If Tet Changes – Puppeteer Only)
 Open dev tools on Tet availability page, locate the nested shadow roots used to display address and offers, and update the query logic in `index.js`. Keep selectors as narrow as possible to avoid false matches.
 
-## 9. Safety / Rate Limits
-API Mode:
-- Default concurrency is a modest batch size (see `DEFAULT_BATCH` in `api.js`). Override with `--batch=<n>` or `BATCH_SIZE` env var.
-- If you begin to see repeated errors (timeouts, 429s), lower batch or pause 1–2 minutes.
-
-Puppeteer Mode:
-- Heavier; keep multiple parallel browser sessions to a minimum.
-- You can still tune internal pacing if needed (not exposed yet – see TODO section).
+## 9. Concurrency / Rate Limits
+Specify batch with `--batch=<n>` (default tuned for moderate throughput). On sustained errors lower value. Puppeteer mode inherently slower—avoid parallel browsers.
 
 ## 10. Next Improvements (To‑Do)
-- Unified CLI wrapper selecting API → fallback automatically
-- Smarter dynamic backoff when API rate‑limited
-- Automatic selector fallback heuristics (Puppeteer)
+- Frontend pointer integration (if not merged)
+- Dynamic backoff when API throttled
 - Optional CSV / Parquet export
-- CLI flags for bounding box filtering
+- Concave hull outlines (current = convex)
+- Bounding box filter flag per import
 
 ## Puppeteer troubleshooting
 
@@ -156,5 +169,7 @@ These steps should resolve most Chrome download / detection issues when running 
 
 ---
 Need a new batch? Just create a fresh bounding box in Overpass Turbo, export, replace `export.geojson`, run again.
+
+Data publishing tip: copy `exports/` (including `pointer.json`) to an external repo for CDN distribution (see root README for link).
 
 Happy scraping (API first, browser only when needed).

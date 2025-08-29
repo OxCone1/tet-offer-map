@@ -3,7 +3,7 @@
  *
  * Major changes:
  *  - All input GeoJSON files are sourced from ./imports/*.geojson (any name)
- *  - On start each file is hashed (shake256 6 hex chars) and renamed to <hash>.geojson (idempotent)
+ *  - On start each file is hashed (shake256 6 bytes => 12 hex chars) and renamed to <hash>.geojson (idempotent)
  *  - Each source GeoJSON is enriched in-place with top-level arrays:
  *        progress: ["osm_id1", "osm_id2", ...]   // successful scraped feature ids
  *        errors:   ["osm_idX", ...]               // failed feature ids
@@ -34,8 +34,9 @@ const RIGA_NEIGHBORHOODS_GEOJSON = path.resolve(__dirname, 'riga_neighborhoods.g
 
 const DEFAULT_BATCH = 5; // default concurrent requests (safe with write lock)
 
+// 6 output bytes => 12 hex characters (we treat 12-hex names as canonical)
 function shake256(content) {
-  return createHash('shake256', {outputLength: 6}).update(content).digest('hex')
+    return createHash('shake256', {outputLength: 6}).update(content).digest('hex');
 }
 
 function getBatchSize() {
@@ -355,21 +356,21 @@ async function hashAndRenameImports() {
         const stat = await fsp.stat(full);
         if (!stat.isFile()) continue;
 
-        // Already hashed & locked? Pattern: _<6hex>.geojson
-        if (/^_[0-9a-f]{6}\.geojson$/i.test(name)) {
+    // Already hashed & locked? Accept _<12hex>.geojson (current) or legacy _<6hex>.geojson
+    if (/^_[0-9a-f]{12}\.geojson$/i.test(name) || /^_[0-9a-f]{6}\.geojson$/i.test(name)) {
             results.push(full);
             continue;
         }
-        // Backward compatibility: previously hashed without underscore -> rename to underscored
-        if (/^[0-9a-f]{6}\.geojson$/i.test(name)) {
+    // Backward compatibility: previously hashed without underscore (6 or 12 hex) -> rename to underscored
+    if (/^[0-9a-f]{12}\.geojson$/i.test(name) || /^[0-9a-f]{6}\.geojson$/i.test(name)) {
             const target = path.join(IMPORTS_DIR, '_' + name);
             if (!fs.existsSync(target)) await fsp.rename(full, target); else if (full !== target) await fsp.unlink(full);
             results.push(target);
             continue;
         }
-        const text = await fsp.readFile(full, 'utf8');
-        const h = shake256(text);
-        const target = path.join(IMPORTS_DIR, `_${h}.geojson`);
+    const text = await fsp.readFile(full, 'utf8');
+    const h = shake256(text); // 12 hex digest
+    const target = path.join(IMPORTS_DIR, `_${h}.geojson`);
         if (path.basename(full) !== `_${h}.geojson`) {
             if (!fs.existsSync(target)) {
                 await fsp.rename(full, target);
@@ -397,7 +398,7 @@ function encodeSearchQuery(address) {
 async function fetchAddressKey(address) {
     const q = encodeSearchQuery(address);
     const url = `https://gateway.tet.lv/api/addresses/search/${q}`;
-    const { data } = await axios.get(url, { timeout: 20000 });
+    const { data } = await axios.get(url, { timeout: 5000 });
     if (!data || !Array.isArray(data.data) || data.data.length === 0) {
         throw new Error('no search hits');
     }
@@ -549,11 +550,11 @@ async function processFeatureInContext(feat, index, total, ctx) {
                 await persistGeoJSON(ctx.filePath, ctx.geojson);
             }
         });
-        console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${id} already exists in ${exportFileName} -> skipped`);
+        // console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${id} already exists in ${exportFileName} -> skipped`);
         return null;
     }
     const address = buildAddressString(props);
-    console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${address}`);
+    // console.log(`[${index + 1}/${total}] (${path.basename(ctx.filePath)}) ${address}`);
     try {
         const addressKey = await fetchAddressKey(address);
         const rawServices = await fetchAvailableServices(addressKey);
@@ -576,7 +577,8 @@ async function processFeatureInContext(feat, index, total, ctx) {
             await persistGeoJSON(ctx.filePath, ctx.geojson);
             ctx.changedExports.add(exportFileName);
         });
-        console.log(`  ✓ ${id} (${internetOffers.length} offers) -> ${exportFileName}`);
+        // console.log(`  ✓ ${id} (${internetOffers.length} offers) -> ${exportFileName}`);
+        // console.log(id)
         return record;
     } catch (err) {
         console.warn(`  ✗ ${id} failed: ${err.message}`);

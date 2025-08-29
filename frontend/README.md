@@ -4,15 +4,14 @@ Live Demo: https://oxcone.com/tet-map/
 
 Interactive web map for visualising Tet (Latvia) internet service availability combined with user‑supplied connectivity data. Built with React + Vite + Leaflet. Supports fuzzy address search, data layer toggles, connection type filtering, clustering / sector highlighting, and per‑property detail modals.
 
-> IMPORTANT: Place the backend‑produced file `tet_offers.ndjson` into this folder's `public/` directory before building so it is served at `/tet_offers.ndjson`.
+> Dataset is fetched dynamically from the remote data repository (pointer index + per‑area slices). Local dataset files are not bundled; only user‑uploaded files are stored locally (in‑browser).
 
 ## 1. Quick Start
 
 ```powershell
 cd frontend
 npm install
-copy ..\data-extractor\tet_offers.ndjson .\public\tet_offers.ndjson  # ensure latest data
-npm run dev            # start dev server
+npm run dev            # start dev server (fetches remote dataset at runtime)
 ```
 
 Build production bundle:
@@ -26,7 +25,9 @@ Deploy (Heroku / static host): serve `dist/` with any SPA static server that fal
 
 ## 2. Data Ingestion
 
-The map expects a Tet offer dataset at `/tet_offers.ndjson` (fetched once on load). Each line is a JSON object with at minimum:
+On load the app downloads the remote pointer index and then lazily fetches required per‑area NDJSON partitions. There is no support for placing local pointer or NDJSON files in `public/`.
+
+Per‑area NDJSON line example:
 
 ```json
 {
@@ -97,10 +98,9 @@ Tailwind (via Vite) + custom components (`ui/*`). Legend dynamically reflects vi
 
 ## 8. Building & Deploying
 
-Ensure fresh data:
+Build production bundle:
 
 ```powershell
-copy ..\data-extractor\tet_offers.ndjson .\public\tet_offers.ndjson
 npm run build
 ```
 
@@ -132,7 +132,7 @@ Ideas:
 ## 12. File Placement Summary
 | Location | Purpose |
 |----------|---------|
-| `public/tet_offers.ndjson` | Required Tet dataset (copied from data-extractor output). |
+| (remote) pointer.json & slices | Auto-fetched dataset (no local copy required). |
 | `src/map.js` | Leaflet integration & clustering. |
 | `src/hooks.jsx` | Composite hooks (data, map, search, storage). |
 | `src/utils.js` | Parsing, search, color, helpers. |
@@ -167,4 +167,6 @@ npx puppeteer browsers install chrome
 3. If needed, clear the Puppeteer cache (path shown in error) and retry, or set `PUPPETEER_EXECUTABLE_PATH` to a local Chrome binary.
 
 ---
-Place `tet_offers.ndjson` → run dev/build → explore. That’s it.
+Data repo (published exports): https://github.com/OxCone1/tet-offer-map-data
+
+Run dev/build → dataset fetched remotely → explore. For local custom data use the upload UI. That’s it.
